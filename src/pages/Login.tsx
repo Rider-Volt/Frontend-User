@@ -35,7 +35,7 @@ const Login = () => {
           </div>
           <h1 className="text-3xl font-bold mb-2">Chào mừng trở lại</h1>
           <p className="text-muted-foreground">
-            Đăng nhập để tiếp tục trải nghiệm dịch vụ thuê xe VinFast
+            Đăng nhập để tiếp tục trải nghiệm dịch vụ thuê xe điện
           </p>
         </div>
 

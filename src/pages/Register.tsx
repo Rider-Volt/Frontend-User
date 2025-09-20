@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { Car, Mail, Lock, Eye, EyeOff, User, Phone, CreditCard } from "lucide-react";
 
@@ -31,10 +30,7 @@ const Register = () => {
       alert("Mật khẩu xác nhận không khớp!");
       return;
     }
-    if (!agreeTerms) {
-      alert("Vui lòng đồng ý với điều khoản sử dụng!");
-      return;
-    }
+    
     // Handle register logic here
     console.log("Register:", formData);
   };
@@ -49,12 +45,12 @@ const Register = () => {
               <Car className="w-8 h-8 text-white" />
             </div>
             <span className="text-2xl font-bold bg-electric-gradient bg-clip-text text-transparent">
-              VinFast Rental
+              EV Rental
             </span>
           </div>
           <h1 className="text-3xl font-bold mb-2">Tạo tài khoản mới</h1>
           <p className="text-muted-foreground">
-            Đăng ký để trải nghiệm dịch vụ thuê xe VinFast tốt nhất
+            Đăng ký để trải nghiệm dịch vụ thuê xe điện tốt nhất
           </p>
         </div>
 
@@ -174,23 +170,7 @@ const Register = () => {
                 </div>
               </div>
 
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="terms"
-                  checked={agreeTerms}
-                  onCheckedChange={setAgreeTerms}
-                />
-                <Label htmlFor="terms" className="text-sm">
-                  Tôi đồng ý với{" "}
-                  <Link to="/terms" className="text-primary hover:underline">
-                    Điều khoản sử dụng
-                  </Link>{" "}
-                  và{" "}
-                  <Link to="/privacy" className="text-primary hover:underline">
-                    Chính sách bảo mật
-                  </Link>
-                </Label>
-              </div>
+              
 
               <Button type="submit" className="w-full" variant="electric">
                 Đăng ký

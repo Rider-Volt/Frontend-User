@@ -1,23 +1,69 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
-import { Car, Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { Car, Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
+  const { toast } = useToast();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle login logic here
-    console.log("Login:", { email, password, rememberMe });
+    setIsLoading(true);
+
+    try {
+      const response = await fetch("https://ridervolt5-ba872bc9c2cf.herokuapp.com/api/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          password,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Lưu token vào localStorage
+        localStorage.setItem("token", data.token || data.access_token);
+        localStorage.setItem("username", data.user?.name || data.user?.username || email);
+        
+        toast({
+          title: "Đăng nhập thành công",
+          description: "Chào mừng bạn đến với EV Rental!",
+        });
+
+        // Chuyển hướng về trang chủ
+        navigate("/");
+      } else {
+        toast({
+          title: "Đăng nhập thất bại",
+          description: data.message || "Email hoặc mật khẩu không đúng",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+      toast({
+        title: "Lỗi kết nối",
+        description: "Không thể kết nối đến server. Vui lòng thử lại sau.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -30,10 +76,10 @@ const Login = () => {
               <Car className="w-8 h-8 text-white" />
             </div>
             <span className="text-2xl font-bold bg-electric-gradient bg-clip-text text-transparent">
-              VinFast Rental
+              EV Rental
             </span>
           </div>
-          <h1 className="text-3xl font-bold mb-2">Chào mừng trở lại</h1>
+          <h1 className="text-2xl font-bold mb-2">Chào mừng bạn đến với EV Rental</h1>
           <p className="text-muted-foreground">
             Đăng nhập để tiếp tục trải nghiệm dịch vụ thuê xe điện
           </p>
@@ -86,22 +132,23 @@ const Login = () => {
 
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="remember"
-                    checked={rememberMe}
-                    onCheckedChange={setRememberMe}
-                  />
-                  <Label htmlFor="remember" className="text-sm">
-                    Ghi nhớ đăng nhập
-                  </Label>
+                  
+                 
                 </div>
                 <Link to="/forgot-password" className="text-sm text-primary hover:underline">
                   Quên mật khẩu?
                 </Link>
               </div>
 
-              <Button type="submit" className="w-full" variant="electric">
-                Đăng nhập
+              <Button type="submit" className="w-full" variant="electric" disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Đang đăng nhập...
+                  </>
+                ) : (
+                  "Đăng nhập"
+                )}
               </Button>
             </form>
 

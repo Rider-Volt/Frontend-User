@@ -53,7 +53,7 @@ const CarSearchPage = () => {
       range: 300,
       pricePerDay: 600000,
       location: "Quận 1, TP.HCM",
-      image: "/src/image/imagecar/e34.jpg",
+      image: "/images/imagecar/e34.jpg",
       available: true
     },
     {
@@ -64,7 +64,7 @@ const CarSearchPage = () => {
       range: 450,
       pricePerDay: 1200000,
       location: "Quận 2, TP.HCM",
-      image: "/src/image/imagecar/vf3.jpg",
+      image: "/images/imagecar/vf3.jpg",
       available: true
     },
     {
@@ -75,7 +75,7 @@ const CarSearchPage = () => {
       range: 380,
       pricePerDay: 960000,
       location: "Quận 7, TP.HCM",
-      image: "/src/image/imagecar/vf5.jpg",
+      image: "/images/imagecar/vf5.jpg",
       available: false
     },
     {
@@ -86,7 +86,7 @@ const CarSearchPage = () => {
       range: 420,
       pricePerDay: 1080000,
       location: "Quận 3, TP.HCM",
-      image: "/src/image/imagecar/vf6.jpg",
+      image: "/images/imagecar/vf6.jpg",
       available: true
     },
     {
@@ -97,7 +97,7 @@ const CarSearchPage = () => {
      range: 300,
      pricePerDay: 600000,
      location: "Quận 1, TP.HCM",
-     image: "/src/image/imagecar/vf7.jpg",
+     image: "/images/imagecar/vf7.jpg",
      available: true
    },
    {
@@ -108,7 +108,7 @@ const CarSearchPage = () => {
      range: 300,
      pricePerDay: 600000,
      location: "Quận 1, TP.HCM",
-     image: "/src/image/imagecar/vf7.jpg",
+     image: "/images/imagecar/vf7.jpg",
      available: true
    },
    {
@@ -119,7 +119,7 @@ const CarSearchPage = () => {
      range: 300,
      pricePerDay: 600000,
      location: "Quận 1, TP.HCM",
-     image: "/src/image/imagecar/vf8.jpg",
+     image: "/images/imagecar/vf8.jpg",
      available: true
    },
    {
@@ -130,7 +130,7 @@ const CarSearchPage = () => {
      range: 300,
      pricePerDay: 600000,
      location: "Quận 1, TP.HCM",
-     image: "/src/image/imagecar/vf8.jpg",
+     image: "/images/imagecar/vf8.jpg",
      available: true
    },
    {
@@ -141,7 +141,7 @@ const CarSearchPage = () => {
      range: 300,
      pricePerDay: 600000,
      location: "Quận 1, TP.HCM",
-     image: "/src/image/imagecar/vf9.jpg",
+     image: "/images/imagecar/vf9.jpg",
      available: true
    },
    {
@@ -152,7 +152,7 @@ const CarSearchPage = () => {
      range: 300,
      pricePerDay: 600000,
      location: "Quận 1, TP.HCM",
-     image: "/src/image/imagecar/vf9.jpg",
+     image: "/images/imagecar/vf9.jpg",
      available: true
    },
    {
@@ -163,7 +163,7 @@ const CarSearchPage = () => {
      range: 300,
      pricePerDay: 600000,
      location: "Quận 1, TP.HCM",
-     image: "/src/image/imagecar/feliz.jpg",
+     image: "/images/imagecar/feliz.jpg",
      available: true
    },
    {
@@ -174,7 +174,7 @@ const CarSearchPage = () => {
      range: 300,
      pricePerDay: 600000,
      location: "Quận 1, TP.HCM",
-     image: "/src/image/imagecar/klaraneo.jpg",
+     image: "/images/imagecar/klaraneo.jpg",
      available: true
    },
    {
@@ -185,7 +185,7 @@ const CarSearchPage = () => {
      range: 300,
      pricePerDay: 600000,
      location: "Quận 1, TP.HCM",
-     image: "/src/image/imagecar/evoneo.jpg",
+     image: "/images/imagecar/evoneo.jpg",
      available: true
    },
    {
@@ -196,7 +196,7 @@ const CarSearchPage = () => {
      range: 300,
      pricePerDay: 600000,
      location: "Quận 1, TP.HCM",
-     image: "/src/image/imagecar/evogrand.jpg",
+     image: "/images/imagecar/evogrand.jpg",
      available: true
    },
    {
@@ -207,7 +207,7 @@ const CarSearchPage = () => {
      range: 300,
      pricePerDay: 600000,
      location: "Quận 1, TP.HCM",
-     image: "/src/image/imagecar/ventoneo.jpg",
+     image: "/images/imagecar/ventoneo.jpg",
      available: true
    },
    

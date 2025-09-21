@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss";
+import { heroui } from "@heroui/react";
 
 export default {
   darkMode: ["class"],
@@ -7,8 +8,8 @@ export default {
     "./components/**/*.{ts,tsx}",
     "./app/**/*.{ts,tsx}",
     "./src/**/*.{ts,tsx}",
+    "node_modules/@heroui/react/**/*.{js,ts,jsx,tsx}", // ✅ HeroUI
   ],
-  prefix: "",
   theme: {
     container: {
       center: true,
@@ -19,31 +20,31 @@ export default {
     },
     extend: {
       colors: {
-        border: "#d1fae5",       // xanh nhạt viền
+        border: "#d1fae5",
         input: "#d1fae5",
-        ring: "#34d399",         // xanh ngọc sáng
+        ring: "#34d399",
         background: "#ffffff",
         foreground: "#111827",
 
         primary: {
-          DEFAULT: "#34d399",    // xanh ngọc chính (emerald-400)
-          foreground: "#ffffff", // chữ trắng
-          glow: "#6ee7b7",       // xanh sáng hơn để làm hiệu ứng glow
+          DEFAULT: "#34d399",       // xanh ngọc
+          foreground: "#ffffff",
+          glow: "#6ee7b7",
         },
         secondary: {
-          DEFAULT: "#a7f3d0",    // xanh bạc hà nhạt
-          foreground: "#065f46", // xanh ngọc đậm cho chữ
+          DEFAULT: "#a7f3d0",
+          foreground: "#065f46",
         },
         destructive: {
-          DEFAULT: "#ef4444",    // đỏ
+          DEFAULT: "#ef4444",
           foreground: "#ffffff",
         },
         muted: {
-          DEFAULT: "#d1fae5",    // xanh nhạt
-          foreground: "#065f46", // chữ xanh đậm
+          DEFAULT: "#d1fae5",
+          foreground: "#065f46",
         },
         accent: {
-          DEFAULT: "#10b981",    // emerald-500 (xanh đậm hơn primary)
+          DEFAULT: "#10b981",
           foreground: "#ffffff",
         },
         popover: {
@@ -55,14 +56,14 @@ export default {
           foreground: "#111827",
         },
         sidebar: {
-          DEFAULT: "#34d399",           
+          DEFAULT: "#34d399",
           foreground: "#ffffff",
-          primary: "#10b981",           
+          primary: "#10b981",
           "primary-foreground": "#ffffff",
-          accent: "#6ee7b7",            
+          accent: "#6ee7b7",
           "accent-foreground": "#065f46",
-          border: "#a7f3d0",            // viền xanh nhạt
-          ring: "#6ee7b7",              // ring xanh sáng
+          border: "#a7f3d0",
+          ring: "#6ee7b7",
         },
       },
       borderRadius: {
@@ -71,13 +72,13 @@ export default {
         sm: "calc(var(--radius) - 4px)",
       },
       backgroundImage: {
-        "electric-gradient": "linear-gradient(to bottom, #5EFCE8, #39F387)", // xanh ngọc → xanh lá
+        "electric-gradient": "linear-gradient(to bottom, #5EFCE8, #39F387)",
         "energy-gradient": "linear-gradient(to right, #39F387, #2ecc71)",
       },
       boxShadow: {
-        electric: "0 8px 30px rgba(94, 252, 232, 0.25)", // xanh ngọc sáng
-        energy: "0 8px 30px rgba(57, 243, 135, 0.25)",   // xanh lá
-        card: "0 4px 15px rgba(0, 0, 0, 0.08)",          // nhẹ cho card
+        electric: "0 8px 30px rgba(94, 252, 232, 0.25)",
+        energy: "0 8px 30px rgba(57, 243, 135, 0.25)",
+        card: "0 4px 15px rgba(0, 0, 0, 0.08)",
       },
       fontFamily: {
         sans: ["Inter", "system-ui", "sans-serif"],
@@ -102,5 +103,8 @@ export default {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [
+    heroui(),                  // ✅ HeroUI plugin
+    require("tailwindcss-animate"),
+  ],
 } satisfies Config;

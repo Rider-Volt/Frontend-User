@@ -22,7 +22,7 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch("https://echo.hoppscotch.io", {
+      const response = await fetch("https://ridervolt-761a9cacc040.herokuapp.com/api/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

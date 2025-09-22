@@ -157,7 +157,7 @@ const CarSearchPage = () => {
    },
    {
      id: 11,
-     name: "xe máy điện VinFast feliz",
+     name: "xe điện VinFast feliz",
      type: "SUV",
      batteryLevel: 85,
      range: 300,
@@ -168,7 +168,7 @@ const CarSearchPage = () => {
    },
    {
      id: 12,
-     name: "xe máy điện VinFast klara Neo ",
+     name: "xe điện VinFast klara Neo ",
      type: "SUV",
      batteryLevel: 85,
      range: 300,
@@ -179,7 +179,7 @@ const CarSearchPage = () => {
    },
    {
      id: 13,
-     name: "xe máy điện VinFast evoneo",
+     name: "xe điện VinFast evoneo",
      type: "SUV",
      batteryLevel: 85,
      range: 300,
@@ -190,7 +190,7 @@ const CarSearchPage = () => {
    },
    {
      id: 14,
-     name: "xe máy điện VinFast evogrand",
+     name: "xe điện VinFast evogrand",
      type: "SUV",
      batteryLevel: 85,
      range: 300,
@@ -201,7 +201,7 @@ const CarSearchPage = () => {
    },
    {
      id: 15,
-     name: "xe máy điện VinFast ventoneo",
+     name: "xe điện VinFast ventoneo",
      type: "SUV",
      batteryLevel: 85,
      range: 300,

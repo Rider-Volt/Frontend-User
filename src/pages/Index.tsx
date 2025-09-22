@@ -520,7 +520,7 @@ const Index: React.FC = () => {
     },
     {
       id: 11,
-      name: "xe máy điện VinFast feliz",
+      name: "xe điện VinFast feliz",
       type: "Xe máy điện",
       batteryLevel: 85,
       range: 300,
@@ -531,7 +531,7 @@ const Index: React.FC = () => {
     },
     {
       id: 12,
-      name: "xe máy điện VinFast klara Neo ",
+      name: "xe điện VinFast klara Neo ",
       type: "Xe máy điện",
       batteryLevel: 85,
       range: 300,
@@ -542,7 +542,7 @@ const Index: React.FC = () => {
     },
     {
       id: 13,
-      name: "xe máy điện VinFast evoneo",
+      name: "xe điện VinFast evoneo",
       type: "Xe máy điện",
       batteryLevel: 85,
       range: 300,
@@ -553,7 +553,7 @@ const Index: React.FC = () => {
     },
     {
       id: 14,
-      name: "xe máy điện VinFast evogrand",
+      name: "xe điện VinFast evogrand",
       type: "Xe máy điện",
       batteryLevel: 85,
       range: 300,
@@ -564,7 +564,7 @@ const Index: React.FC = () => {
     },
     {
       id: 15,
-      name: "xe máy điện VinFast ventoneo",
+      name: "xe điện VinFast ventoneo",
       type: "Xe máy điện",
       batteryLevel: 85,
       range: 300,

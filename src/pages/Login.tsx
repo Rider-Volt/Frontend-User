@@ -22,7 +22,7 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch("https://ridervolt5-ba872bc9c2cf.herokuapp.com/api/login", {
+      const response = await fetch("https://ridervolt-761a9cacc040.herokuapp.com/api/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

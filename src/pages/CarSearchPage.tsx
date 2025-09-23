@@ -69,51 +69,51 @@ const CarSearchPage = () => {
   // demo data
   const popularCars = [
     {
-      id: 1,
-      name: "VinFast VF e34",
-      type: "Ô tô điện",
-      batteryLevel: 85,
-      range: 300,
-      pricePerDay: 600000,
-      location: "Quận 1, TP.HCM",
-      image: "/images/imagecar/e34.jpg",
-      available: true,
-    },
-    {
-      id: 2,
-      name: "VINFAST VF 3",
-      type: "Ô tô điện",
-      batteryLevel: 92,
-      range: 450,
-      pricePerDay: 1200000,
-      location: "Quận 2, TP.HCM",
-      image: "/images/imagecar/vf3.jpg",
-      available: true,
-    },
-    {
-      id: 3,
-      name: "VINFAST VF 5",
-      type: "Ô tô điện",
-      batteryLevel: 78,
-      range: 380,
-      pricePerDay: 960000,
-      location: "Quận 7, TP.HCM",
-      image: "/images/imagecar/vf5.jpg",
-      available: false,
-    },
-    {
-      id: 4,
-      name: "VINFAST VF 6",
-      type: "Ô tô điện",
-      batteryLevel: 88,
-      range: 420,
-      pricePerDay: 1080000,
-      location: "Quận 3, TP.HCM",
-      image: "/images/imagecar/vf6.jpg",
-      available: true,
-    },
-    {
-      id: 5,
+       id: 1,
+       name: "VinFast VF e34",
+       type: "Ô tô điện",
+       batteryLevel: 85,
+       range: 300,
+       pricePerDay: 600000,
+       location: "Quận 1, TP.HCM",
+       image: "/images/imagecar/e34.jpg",
+       available: true
+     },
+     {
+       id: 2,
+       name: "VINFAST VF 3",
+       type: "Ô tô điện",
+       batteryLevel: 92,
+       range: 450,
+       pricePerDay: 1200000,
+       location: "Quận 2, TP.HCM",
+       image: "/images/imagecar/vf3.jpg",
+       available: true
+     },
+     {
+       id: 3,
+       name: "VINFAST VF 5",
+       type: "SÔ tô điện",
+       batteryLevel: 78,
+       range: 380,
+       pricePerDay: 960000,
+       location: "Quận 7, TP.HCM",
+       image: "/images/imagecar/vf5.jpg",
+       available: false
+     },
+     {
+       id: 4,
+       name: "VINFAST VF 6",
+       type: "Ô tô điện",
+       batteryLevel: 88,
+       range: 420,
+       pricePerDay: 1080000,
+       location: "Quận 3, TP.HCM",
+       image: "/images/imagecar/vf6.jpg",
+       available: true
+     },
+     {
+      id: 55,
       name: "VINFAST VF 7",
       type: "Ô tô điện",
       batteryLevel: 85,
@@ -121,7 +121,7 @@ const CarSearchPage = () => {
       pricePerDay: 600000,
       location: "Quận 1, TP.HCM",
       image: "/images/imagecar/vf7.jpg",
-      available: true,
+      available: true
     },
     {
       id: 6,
@@ -132,7 +132,7 @@ const CarSearchPage = () => {
       pricePerDay: 600000,
       location: "Quận 1, TP.HCM",
       image: "/images/imagecar/vf7.jpg",
-      available: true,
+      available: true
     },
     {
       id: 7,
@@ -143,7 +143,7 @@ const CarSearchPage = () => {
       pricePerDay: 600000,
       location: "Quận 1, TP.HCM",
       image: "/images/imagecar/vf8.jpg",
-      available: true,
+      available: true
     },
     {
       id: 8,
@@ -154,7 +154,7 @@ const CarSearchPage = () => {
       pricePerDay: 600000,
       location: "Quận 1, TP.HCM",
       image: "/images/imagecar/vf8.jpg",
-      available: true,
+      available: true
     },
     {
       id: 9,
@@ -165,7 +165,7 @@ const CarSearchPage = () => {
       pricePerDay: 600000,
       location: "Quận 1, TP.HCM",
       image: "/images/imagecar/vf9.jpg",
-      available: true,
+      available: true
     },
     {
       id: 10,
@@ -176,7 +176,7 @@ const CarSearchPage = () => {
       pricePerDay: 600000,
       location: "Quận 1, TP.HCM",
       image: "/images/imagecar/vf9.jpg",
-      available: true,
+      available: true
     },
     {
       id: 11,
@@ -187,7 +187,7 @@ const CarSearchPage = () => {
       pricePerDay: 600000,
       location: "Quận 1, TP.HCM",
       image: "/images/imagecar/feliz.jpg",
-      available: true,
+      available: true
     },
     {
       id: 12,
@@ -198,7 +198,7 @@ const CarSearchPage = () => {
       pricePerDay: 600000,
       location: "Quận 1, TP.HCM",
       image: "/images/imagecar/klaraneo.jpg",
-      available: true,
+      available: true
     },
     {
       id: 13,
@@ -209,7 +209,7 @@ const CarSearchPage = () => {
       pricePerDay: 600000,
       location: "Quận 1, TP.HCM",
       image: "/images/imagecar/evoneo.jpg",
-      available: true,
+      available: true
     },
     {
       id: 14,
@@ -220,7 +220,7 @@ const CarSearchPage = () => {
       pricePerDay: 600000,
       location: "Quận 1, TP.HCM",
       image: "/images/imagecar/evogrand.jpg",
-      available: true,
+      available: true
     },
     {
       id: 15,
@@ -231,7 +231,7 @@ const CarSearchPage = () => {
       pricePerDay: 600000,
       location: "Quận 1, TP.HCM",
       image: "/images/imagecar/ventoneo.jpg",
-      available: true,
+      available: true
     },
   ];
 

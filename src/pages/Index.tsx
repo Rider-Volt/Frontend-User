@@ -4,6 +4,7 @@ import Navbar from "../components/heroUi/Navbar";
 import SearchBar, { VehicleType } from "../components/heroUi/Searchbar";
 import { useNavigate } from "react-router-dom";
 import EVCard from "../components/heroUi/EVCard";
+import { groupCarsByType, Car as CarType } from "@/services/carServices";
 
 const Index: React.FC = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -12,17 +13,21 @@ const Index: React.FC = () => {
 
   useEffect(() => {
     const token = localStorage.getItem("token");
-    const name = localStorage.getItem("username");
-    setIsLoggedIn(!!token);
-    if (name) setUsername(name);
-  }, []);
+    const userData = localStorage.getItem("user");
 
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("username");
-    setIsLoggedIn(false);
-    setUsername("");
-  };
+    if (token && userData) {
+      setIsLoggedIn(true);
+      try {
+        const parsed = JSON.parse(userData);
+        setUsername(parsed.username || parsed.full_name || parsed.email || "");
+      } catch {
+        setUsername("");
+      }
+    } else {
+      setIsLoggedIn(false);
+      setUsername("");
+    }
+  }, []);
 
   const handleSearchSubmit = (params: {
     location: string;
@@ -35,14 +40,16 @@ const Index: React.FC = () => {
     if (params.startDate) searchParams.append("start", params.startDate);
     if (params.endDate) searchParams.append("end", params.endDate);
     if (params.vehicleType) searchParams.append("type", params.vehicleType);
+
     navigate(`/search?${searchParams.toString()}`);
   };
 
-  const popularCars = [
+  // 🚗 Dữ liệu demo ngay tại đây
+  const popularCars: CarType[] = [
     {
       id: 1,
       name: "VinFast VF e34",
-      type: "SUV",
+      type: "Ô tô điện",
       batteryLevel: 85,
       range: 300,
       pricePerDay: 600000,
@@ -53,7 +60,7 @@ const Index: React.FC = () => {
     {
       id: 2,
       name: "VINFAST VF 3",
-      type: "SUV",
+      type: "Ô tô điện",
       batteryLevel: 92,
       range: 450,
       pricePerDay: 1200000,
@@ -61,16 +68,81 @@ const Index: React.FC = () => {
       image: "/images/imagecar/vf3.jpg",
       available: true,
     },
-    // ...các xe khác
+    {
+      id: 3,
+      name: "VINFAST VF 5",
+      type: "Ô tô điện",
+      batteryLevel: 78,
+      range: 380,
+      pricePerDay: 960000,
+      location: "Quận 7, TP.HCM",
+      image: "/images/imagecar/vf5.jpg",
+      available: false,
+    },
+    {
+      id: 4,
+      name: "VINFAST VF 6",
+      type: "Ô tô điện",
+      batteryLevel: 88,
+      range: 420,
+      pricePerDay: 1080000,
+      location: "Quận 3, TP.HCM",
+      image: "/images/imagecar/vf6.jpg",
+      available: true,
+    },
+    {
+      id: 5,
+      name: "Xe máy điện VinFast Klara Neo",
+      type: "Xe máy điện",
+      batteryLevel: 85,
+      range: 300,
+      pricePerDay: 600000,
+      location: "Quận 1, TP.HCM",
+      image: "/images/imagecar/klaraneo.jpg",
+      available: true,
+    },
+    {
+      id: 6,
+      name: "Xe máy điện VinFast EvoGrand",
+      type: "Xe máy điện",
+      batteryLevel: 85,
+      range: 300,
+      pricePerDay: 600000,
+      location: "Quận 1, TP.HCM",
+      image: "/images/imagecar/evogrand.jpg",
+      available: true,
+    },
+    {
+      id: 7,
+      name: "Xe máy điện VinFast Feliz",
+      type: "Xe máy điện",
+      batteryLevel: 85,
+      range: 200,
+      pricePerDay: 200000,
+      location: "Quận 1, TP.HCM",
+      image: "/images/imagecar/feliz.jpg",
+      available: true,
+    },
+    {
+      id: 8,
+      name: "Xe máy điện VinFast EvoNeo",
+      type: "Xe máy điện",
+      batteryLevel: 75,
+      range: 180,
+      pricePerDay: 400000,
+      location: "Quận Bình Thạnh, TP.HCM",
+      image: "/images/imagecar/evoneo.jpg",
+      available: true,
+    },
   ];
+
+  // ✅ Nhóm xe theo loại
+  const carGroups = groupCarsByType(popularCars);
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-secondary/20 to-accent/20">
-      <Navbar
-        isLoggedIn={isLoggedIn}
-        username={username}
-        onLogout={handleLogout}
-      />
+      {/* Navbar */}
+      <Navbar isLoggedIn={isLoggedIn} username={username} />
 
       {/* Hero */}
       <main className="flex-1">
@@ -103,15 +175,33 @@ const Index: React.FC = () => {
           </div>
         </section>
 
-        {/* Popular Cars */}
+        {/* Popular Cars theo loại */}
         <section className="py-16 px-4 bg-secondary/10">
-          <div className="container mx-auto max-w-7xl">
-            <h2 className="text-3xl font-bold text-center mb-8">Xe phổ biến</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {popularCars.map((car) => (
-                <EVCard key={car.id} {...car} />
-              ))}
-            </div>
+          <div className="container mx-auto max-w-7xl space-y-16">
+            {Object.entries(carGroups).map(([groupName, cars]) => (
+              <div key={groupName}>
+                <div className="flex justify-between items-center mb-8">
+                  <h2 className="text-3xl font-bold">{groupName}</h2>
+                  <button
+                    onClick={() => navigate(`/search?type=${groupName}`)}
+                    className="text-primary hover:underline"
+                  >
+                    Xem tất cả
+                  </button>
+                </div>
+                {cars.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {cars.map((car) => (
+                      <EVCard key={car.id} {...car} />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-center text-muted-foreground">
+                    Hiện chưa có xe {groupName.toLowerCase()} nào.
+                  </p>
+                )}
+              </div>
+            ))}
           </div>
         </section>
 

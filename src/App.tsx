@@ -11,6 +11,8 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import RentalPoints from "./pages/RentalPoints";
 import NotFound from "./pages/NotFound";
+import AdminLayout from '@/components/layout/AdminLayout';
+import AdminDashboardPage from './pages/AdminDashboardMenu';
 
 const queryClient = new QueryClient();
 
@@ -30,6 +32,10 @@ const App = () => (
           <Route path="/register" element={<Register />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
+           <Route path="/admin" element={<AdminLayout />}>
+           <Route path="dashboard" element={<AdminDashboardPage />} />
+
+          </Route>
         </Routes>
       </BrowserRouter>
     </TooltipProvider>

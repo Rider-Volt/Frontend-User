@@ -19,7 +19,6 @@ interface SearchBarProps {
 function formatDate(date: DateValue | null): string {
   if (!date) return "";
   const jsDate = date.toDate("UTC");
-  // 👉 format dd/MM/yyyy khi submit
   return new Intl.DateTimeFormat("vi-VN").format(jsDate);
 }
 

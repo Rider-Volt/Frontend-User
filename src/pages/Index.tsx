@@ -3,7 +3,7 @@ import { Car, Shield, Ticket, HeartHandshake } from "lucide-react";
 import Navbar from "../components/heroUi/Navbar";
 import SearchBar, { VehicleType } from "../components/heroUi/Searchbar";
 import { useNavigate } from "react-router-dom";
-import EVCard from "../components/heroUi/EVCard";
+import EVCard from "@/components/heroUi/EVCard"; // 👉 import EVCard mới
 import { groupCarsByType, Car as CarType } from "@/services/carServices";
 
 const Index: React.FC = () => {
@@ -44,7 +44,14 @@ const Index: React.FC = () => {
     navigate(`/search?${searchParams.toString()}`);
   };
 
-  // 🚗 Dữ liệu demo ngay tại đây
+  const handleBookingSubmit = (bookingData: any) => {
+    console.log("Booking submitted:", bookingData);
+    alert(
+      `Đặt xe thành công! Tổng tiền: ${bookingData.totalPrice.toLocaleString()}đ`
+    );
+  };
+
+  // 🚗 demo
   const popularCars: CarType[] = [
     {
       id: 1,
@@ -91,8 +98,19 @@ const Index: React.FC = () => {
       available: true,
     },
     {
-      id: 5,
-      name: "Xe máy điện VinFast Klara Neo",
+      id: 11,
+      name: "xe máy điện VinFast feliz",
+      type: "Xe máy điện",
+      batteryLevel: 85,
+      range: 300,
+      pricePerDay: 600000,
+      location: "Quận 1, TP.HCM",
+      image: "/images/imagecar/feliz.jpg",
+      available: true,
+    },
+    {
+      id: 12,
+      name: "xe máy điện VinFast klara Neo ",
       type: "Xe máy điện",
       batteryLevel: 85,
       range: 300,
@@ -102,8 +120,19 @@ const Index: React.FC = () => {
       available: true,
     },
     {
-      id: 6,
-      name: "Xe máy điện VinFast EvoGrand",
+      id: 13,
+      name: "xe máy điện VinFast evoneo",
+      type: "Xe máy điện",
+      batteryLevel: 85,
+      range: 300,
+      pricePerDay: 600000,
+      location: "Quận 1, TP.HCM",
+      image: "/images/imagecar/evoneo.jpg",
+      available: true,
+    },
+    {
+      id: 14,
+      name: "xe máy điện VinFast evogrand",
       type: "Xe máy điện",
       batteryLevel: 85,
       range: 300,
@@ -112,36 +141,12 @@ const Index: React.FC = () => {
       image: "/images/imagecar/evogrand.jpg",
       available: true,
     },
-    {
-      id: 7,
-      name: "Xe máy điện VinFast Feliz",
-      type: "Xe máy điện",
-      batteryLevel: 85,
-      range: 200,
-      pricePerDay: 200000,
-      location: "Quận 1, TP.HCM",
-      image: "/images/imagecar/feliz.jpg",
-      available: true,
-    },
-    {
-      id: 8,
-      name: "Xe máy điện VinFast EvoNeo",
-      type: "Xe máy điện",
-      batteryLevel: 75,
-      range: 180,
-      pricePerDay: 400000,
-      location: "Quận Bình Thạnh, TP.HCM",
-      image: "/images/imagecar/evoneo.jpg",
-      available: true,
-    },
   ];
 
-  // ✅ Nhóm xe theo loại
   const carGroups = groupCarsByType(popularCars);
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-secondary/20 to-accent/20">
-      {/* Navbar */}
       <Navbar isLoggedIn={isLoggedIn} username={username} />
 
       {/* Hero */}
@@ -157,25 +162,21 @@ const Index: React.FC = () => {
           </div>
 
           <div className="relative z-10 container mx-auto px-4 text-center">
-            <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-[1.2] text-white">
+            <h1 className="text-5xl md:text-7xl font-bold mb-6 text-white">
               Thuê xe điện{" "}
-              <span className="block bg-gradient-to-r from-green-400 to-blue-400 bg-clip-text text-transparent pb-5">
+              <span className="block bg-gradient-to-r from-green-400 to-blue-400 bg-clip-text text-transparent">
                 Tương lai xanh
               </span>
             </h1>
-
-            <p className="text-xl md:text-2xl text-white/90 mb-12 max-w-3xl mx-auto">
+            <p className="text-xl text-white/90 mb-12 max-w-3xl mx-auto">
               Trải nghiệm công nghệ xe điện tiên tiến. Thuê xe theo ngày, thuận
               tiện và thân thiện với môi trường.
             </p>
-
-            <div className="max-w-5xl mx-auto">
-              <SearchBar onSubmit={handleSearchSubmit} />
-            </div>
+            <SearchBar onSubmit={handleSearchSubmit} />
           </div>
         </section>
 
-        {/* Popular Cars theo loại */}
+        {/* Popular Cars */}
         <section className="py-16 px-4 bg-secondary/10">
           <div className="container mx-auto max-w-7xl space-y-16">
             {Object.entries(carGroups).map(([groupName, cars]) => (
@@ -189,17 +190,15 @@ const Index: React.FC = () => {
                     Xem tất cả
                   </button>
                 </div>
-                {cars.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    {cars.map((car) => (
-                      <EVCard key={car.id} {...car} />
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-center text-muted-foreground">
-                    Hiện chưa có xe {groupName.toLowerCase()} nào.
-                  </p>
-                )}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  {cars.map((car) => (
+                    <EVCard
+                      key={car.id}
+                      {...car}
+                      onBookingSubmit={handleBookingSubmit}
+                    />
+                  ))}
+                </div>
               </div>
             ))}
           </div>
@@ -213,23 +212,14 @@ const Index: React.FC = () => {
               <div>
                 <Shield className="h-12 w-12 mx-auto text-primary mb-4" />
                 <h4 className="font-semibold">Uy tín</h4>
-                <p className="text-muted-foreground">
-                  Đối tác & bảo hiểm cho mọi chuyến đi
-                </p>
               </div>
               <div>
                 <Ticket className="h-12 w-12 mx-auto text-primary mb-4" />
                 <h4 className="font-semibold">Thuê theo ngày</h4>
-                <p className="text-muted-foreground">
-                  Linh hoạt từ 1 ngày đến 1 tháng
-                </p>
               </div>
               <div>
                 <HeartHandshake className="h-12 w-12 mx-auto text-primary mb-4" />
                 <h4 className="font-semibold">Hỗ trợ 24/7</h4>
-                <p className="text-muted-foreground">
-                  Chăm sóc khách hàng tận tâm
-                </p>
               </div>
             </div>
           </div>
@@ -238,41 +228,7 @@ const Index: React.FC = () => {
 
       {/* Footer */}
       <footer className="bg-gray-900 text-gray-300 py-12 px-4 mt-auto">
-        <div className="container mx-auto max-w-7xl grid grid-cols-1 md:grid-cols-4 gap-8">
-          <div>
-            <div className="flex items-center gap-2 mb-4">
-              <Car className="h-6 w-6 text-primary" />
-              <span className="text-xl font-bold text-white">EV Rental</span>
-            </div>
-            <p className="text-gray-400">
-              Đồng hành cùng bạn trên mọi hành trình xanh.
-            </p>
-          </div>
-          <div>
-            <h4 className="font-semibold text-white mb-4">Dịch vụ</h4>
-            <ul className="space-y-2">
-              <li className="hover:text-white cursor-pointer">Đặt xe</li>
-              <li className="hover:text-white cursor-pointer">Bảng giá</li>
-              <li className="hover:text-white cursor-pointer">Khuyến mãi</li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-semibold text-white mb-4">Hỗ trợ</h4>
-            <ul className="space-y-2">
-              <li className="hover:text-white cursor-pointer">Liên hệ</li>
-              <li className="hover:text-white cursor-pointer">FAQ</li>
-              <li className="hover:text-white cursor-pointer">Chính sách</li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-semibold text-white mb-4">Theo dõi</h4>
-            <ul className="space-y-2">
-              <li className="hover:text-white cursor-pointer">Facebook</li>
-              <li className="hover:text-white cursor-pointer">Instagram</li>
-              <li className="hover:text-white cursor-pointer">Twitter</li>
-            </ul>
-          </div>
-        </div>
+        <div className="container mx-auto max-w-7xl">EV Rental © 2025</div>
       </footer>
     </div>
   );

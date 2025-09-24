@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Car, Mail, Lock, Eye, EyeOff, User, Phone } from "lucide-react";
+import { FcGoogle } from "react-icons/fc";
+import { FaFacebook } from "react-icons/fa";
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -22,7 +24,7 @@ const Register = () => {
   const navigate = useNavigate();
 
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const validateForm = () => {
@@ -30,7 +32,8 @@ const Register = () => {
     if (!/\S+@\S+\.\S+/.test(formData.email)) return "Email không hợp lệ";
     if (!/^[0-9]{9,11}$/.test(formData.phone)) return "Số điện thoại không hợp lệ";
     if (formData.password.length < 6) return "Mật khẩu phải ít nhất 6 ký tự";
-    if (formData.password !== formData.confirmPassword) return "Mật khẩu xác nhận không khớp";
+    if (formData.password !== formData.confirmPassword)
+      return "Mật khẩu xác nhận không khớp";
     return null;
   };
 
@@ -44,18 +47,21 @@ const Register = () => {
 
     setLoading(true);
     try {
-      const response = await fetch("https://ridervolt-761a9cacc040.herokuapp.com/api/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          fullName: formData.fullName,
-          email: formData.email,
-          phone: formData.phone,
-          password: formData.password
-        })
-      });
+      const response = await fetch(
+        "https://ridervolt-761a9cacc040.herokuapp.com/api/register",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            fullName: formData.fullName,
+            email: formData.email,
+            phone: formData.phone,
+            password: formData.password
+          })
+        }
+      );
 
       const data = await response.json();
 
@@ -168,7 +174,11 @@ const Register = () => {
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
                   >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    {showPassword ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
                   </button>
                 </div>
               </div>
@@ -189,35 +199,69 @@ const Register = () => {
                   />
                   <button
                     type="button"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    onClick={() =>
+                      setShowConfirmPassword(!showConfirmPassword)
+                    }
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
                   >
-                    {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    {showConfirmPassword ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
                   </button>
                 </div>
               </div>
 
               {/* Submit */}
-              <Button type="submit" className="w-full" variant="electric" disabled={loading}>
+              <Button
+                type="submit"
+                className="w-full"
+                variant="electric"
+                disabled={loading}
+              >
                 {loading ? "Đang xử lý..." : "Đăng ký"}
               </Button>
             </form>
 
-            <div className="mt-6">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <Separator className="w-full" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">Hoặc</span>
-                </div>
+            {/* Separator */}
+            <div className="mt-6 relative">
+              <div className="absolute inset-0 flex items-center">
+                <Separator className="w-full" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">
+                  Hoặc
+                </span>
               </div>
             </div>
 
+            {/* Social login */}
+            <div className="mt-6 flex flex-col gap-3">
+              <Button
+                variant="outline"
+                className="w-full flex items-center justify-center gap-2"
+              >
+                <FcGoogle className="w-5 h-5" />
+                Đăng ký với Google
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full flex items-center justify-center gap-2 text-blue-600"
+              >
+                <FaFacebook className="w-5 h-5" />
+                Đăng ký với Facebook
+              </Button>
+            </div>
+
+            {/* Footer */}
             <div className="mt-6 text-center">
               <p className="text-sm text-muted-foreground">
                 Đã có tài khoản?{" "}
-                <Link to="/login" className="text-primary hover:underline font-medium">
+                <Link
+                  to="/login"
+                  className="text-primary hover:underline font-medium"
+                >
                   Đăng nhập ngay
                 </Link>
               </p>

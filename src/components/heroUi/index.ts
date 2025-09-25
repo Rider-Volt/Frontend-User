@@ -6,7 +6,7 @@ export { default as SearchForm } from "./Searchbar";
 
 // HeroUI wrapper components
 export { default as Button } from "./Button";
-export { Card, CardHeader, CardBody, CardFooter } from "./Card";
+export {default as EVCard} from "./EVCard";
 export { default as Chip } from "./Chip";
 export { default as Input } from "./Input";
 export { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "./Modal";

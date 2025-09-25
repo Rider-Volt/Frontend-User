@@ -17,7 +17,9 @@ interface SearchBarProps {
 
 // ================== Helper ==================
 function formatDate(date: DateValue | null): string {
-  return date ? date.toDate("UTC").toISOString().split("T")[0] : "";
+  if (!date) return "";
+  const jsDate = date.toDate("UTC");
+  return new Intl.DateTimeFormat("vi-VN").format(jsDate);
 }
 
 // ================== Component ==================
@@ -30,7 +32,6 @@ export default function SearchBar({ onSubmit }: SearchBarProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // ✅ Validation: ngày trả xe < ngày nhận xe
     if (startDate && endDate && endDate.compare(startDate) < 0) {
       alert("Ngày trả xe không được nhỏ hơn ngày nhận xe!");
       return;
@@ -76,6 +77,7 @@ export default function SearchBar({ onSubmit }: SearchBarProps) {
               onChange={setStartDate}
               variant="bordered"
               size="lg"
+              granularity="day"
               popoverProps={{
                 portalContainer: document.body,
                 classNames: { content: "z-[9999]" },
@@ -94,7 +96,8 @@ export default function SearchBar({ onSubmit }: SearchBarProps) {
               onChange={setEndDate}
               variant="bordered"
               size="lg"
-              minValue={startDate || undefined} // 👈 auto disable ngày bé hơn ngày nhận
+              granularity="day"
+              minValue={startDate || undefined}
               popoverProps={{
                 portalContainer: document.body,
                 classNames: { content: "z-[9999]" },
@@ -111,9 +114,7 @@ export default function SearchBar({ onSubmit }: SearchBarProps) {
               placeholder="Chọn loại xe"
               selectedKeys={vehicleType ? [vehicleType] : []}
               onSelectionChange={(keys) => {
-                const selectedKey = Array.from(
-                  keys
-                )[0]?.toString() as VehicleType;
+                const selectedKey = Array.from(keys)[0]?.toString() as VehicleType;
                 setVehicleType(selectedKey || "");
               }}
               variant="bordered"

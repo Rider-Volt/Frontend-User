@@ -9,15 +9,26 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { logoutApi } from "@/services/authService";
 
 interface NavbarProps {
   isLoggedIn: boolean;
   username: string;
-  onLogout: () => void;
 }
 
-const Navbar: React.FC<NavbarProps> = ({ isLoggedIn, username, onLogout }) => {
+const Navbar: React.FC<NavbarProps> = ({ isLoggedIn, username }) => {
   const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    try {
+      await logoutApi(); // gọi API logout
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      navigate("/login");
+    } catch (err) {
+      console.error("Logout failed:", err);
+    }
+  };
 
   return (
     <header className="bg-white shadow border-b sticky top-0 z-50">
@@ -32,28 +43,16 @@ const Navbar: React.FC<NavbarProps> = ({ isLoggedIn, username, onLogout }) => {
 
         {/* Navigation links */}
         <nav className="hidden md:flex items-center space-x-8">
-          <Link
-            to="/"
-            className="text-foreground hover:text-primary font-medium"
-          >
+          <Link to="/" className="text-foreground hover:text-primary font-medium">
             Trang chủ
           </Link>
-          <Link
-            to="/search"
-            className="text-foreground hover:text-primary font-medium"
-          >
+          <Link to="/search" className="text-foreground hover:text-primary font-medium">
             Tìm xe
           </Link>
-          <Link
-            to="/rental-points"
-            className="text-foreground hover:text-primary font-medium"
-          >
+          <Link to="/rental-points" className="text-foreground hover:text-primary font-medium">
             Điểm thuê
           </Link>
-          <Link
-            to="/cars"
-            className="text-foreground hover:text-primary font-medium"
-          >
+          <Link to="/cars" className="text-foreground hover:text-primary font-medium">
             Lịch sử đặt xe
           </Link>
         </nav>
@@ -76,6 +75,9 @@ const Navbar: React.FC<NavbarProps> = ({ isLoggedIn, username, onLogout }) => {
                 sideOffset={8}
                 className="w-48 rounded-lg shadow-lg border bg-popover text-popover-foreground"
               >
+                <DropdownMenuLabel>
+                  Xin chào, <span className="font-semibold">{username}</span>
+                </DropdownMenuLabel>
                 <DropdownMenuSeparator />
 
                 <DropdownMenuItem
@@ -95,7 +97,7 @@ const Navbar: React.FC<NavbarProps> = ({ isLoggedIn, username, onLogout }) => {
                 <DropdownMenuSeparator />
 
                 <DropdownMenuItem
-                  onClick={onLogout}
+                  onClick={handleLogout}
                   className="cursor-pointer text-red-600 hover:bg-red-50"
                 >
                   Đăng xuất

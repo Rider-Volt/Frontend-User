@@ -1,6 +1,6 @@
 // src/services/authService.ts
 
-export const API_BASE = "https://ridervolt-761a9cacc040.herokuapp.com/api";
+export const API_BASE = "https://backend.ridervolt.app/api";
 
 // Cho phép chỉnh endpoint nếu BE khác tên
 export const PROFILE_ENDPOINTS = {

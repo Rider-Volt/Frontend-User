@@ -17,7 +17,7 @@ const AdminSidebar = ({ isOpen, onToggle }: AdminSidebarProps) => {
     },
     {
       name: 'Doanh thu',
-      href: '/admin/revenue',
+      href: '/admin/',
       icon: DollarSign
     },
     {
@@ -27,22 +27,22 @@ const AdminSidebar = ({ isOpen, onToggle }: AdminSidebarProps) => {
     },
     {
       name: 'quản lí xe điện',
-      href: '/admin/provinces',
+      href: '/admin/',
       icon: Car
     },
     {
       name: 'Quản lý đơn thuê',
-      href: '/admin/buses',
+      href: '/admin/',
       icon: Calendar
     },
     {
       name: 'Khách hàng',
-      href: '/admin/customers',
+      href: '/admin/',
       icon: Users
     },
     {
       name: 'Quản lý nhân viên',
-      href: '/admin/tickets',
+      href: '/admin/',
       icon: UserCog
     }
   ];

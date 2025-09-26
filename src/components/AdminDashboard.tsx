@@ -1,7 +1,5 @@
 import { useState } from 'react';
-import {
-  DollarSign, Users, Car, CalendarCheck, Settings, Search, Edit, Trash2, UserCheck, UserX
-} from 'lucide-react';
+import {DollarSign, Users, Car, CalendarCheck, Settings, Search, Edit, Trash2, UserCheck, UserX} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';

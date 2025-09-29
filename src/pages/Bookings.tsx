@@ -3,9 +3,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, Clock, MapPin, Car, CreditCard, Phone, Mail, User } from "lucide-react";
+import { Calendar, Clock, MapPin, Car, CreditCard, Phone, Mail, User, Eye, X } from "lucide-react";
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
+import Navbar from "@/components/heroUi/Navbar";
+import { useNavigate } from "react-router-dom";
 
 interface Booking {
   id: string;
@@ -109,10 +111,43 @@ const getStatusText = (status: string) => {
 
 const Bookings = () => {
   const [bookings] = useState<Booking[]>(mockBookings);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [username, setUsername] = useState("");
+  const navigate = useNavigate();
 
   const confirmedBookings = bookings.filter(b => b.status === "confirmed");
   const activeBookings = bookings.filter(b => b.status === "active");
   const completedBookings = bookings.filter(b => b.status === "completed");
+
+  const getStatusVariant = (status: string) => {
+    switch (status) {
+      case "confirmed":
+        return "default";
+      case "active":
+        return "secondary";
+      case "completed":
+        return "outline";
+      case "cancelled":
+        return "destructive";
+      default:
+        return "default";
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case "confirmed":
+        return "Đã xác nhận";
+      case "active":
+        return "Đang sử dụng";
+      case "completed":
+        return "Hoàn thành";
+      case "cancelled":
+        return "Đã hủy";
+      default:
+        return status;
+    }
+  };
 
   const BookingCard = ({ booking }: { booking: Booking }) => (
     <Card className="hover:shadow-lg transition-shadow">
@@ -224,23 +259,25 @@ const Bookings = () => {
   );
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gradient-to-br from-secondary/20 to-accent/20">
+      <Navbar isLoggedIn={isLoggedIn} username={username} />
+      
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Lịch sử đặt xe</h1>
           <p className="text-muted-foreground">
-            Quản lý và theo dõi các đặt xe của bạn
+            Quản lý và theo dõi tất cả các đặt xe của bạn
           </p>
         </div>
 
         <Tabs defaultValue="all" className="w-full">
           <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="all">Tất cả</TabsTrigger>
-            <TabsTrigger value="confirmed">Đã xác nhận</TabsTrigger>
-            <TabsTrigger value="active">Đang sử dụng</TabsTrigger>
-            <TabsTrigger value="completed">Hoàn thành</TabsTrigger>
+            <TabsTrigger value="all">Tất cả ({bookings.length})</TabsTrigger>
+            <TabsTrigger value="confirmed">Đã xác nhận ({confirmedBookings.length})</TabsTrigger>
+            <TabsTrigger value="active">Đang sử dụng ({activeBookings.length})</TabsTrigger>
+            <TabsTrigger value="completed">Hoàn thành ({completedBookings.length})</TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="all" className="space-y-4">
             {bookings.length === 0 ? (
               <Card>
@@ -250,6 +287,12 @@ const Bookings = () => {
                   <p className="text-muted-foreground">
                     Bạn chưa có đặt xe nào. Hãy bắt đầu đặt xe điện ngay!
                   </p>
+                  <Button 
+                    className="mt-4" 
+                    onClick={() => navigate("/")}
+                  >
+                    Đặt xe ngay
+                  </Button>
                 </CardContent>
               </Card>
             ) : (

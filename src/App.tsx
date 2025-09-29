@@ -6,13 +6,19 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import CarSearchPage from "./pages/CarSearchPage";
 import Bookings from "./pages/Bookings";
+import VehicleDetailsPage from "./pages/VehicleDetailsPage";
 import Profile from "./pages/Profile";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
-import RentalPoints from "./pages/RentalPoints";
+import StationsPage from "./pages/StationsPage";
 import NotFound from "./pages/NotFound";
 import AdminLayout from '@/components/layout/AdminLayout';
 import AdminDashboardPage from './pages/AdminDashboardMenu';
+import AdminRevenuePage from './pages/AdminRevenuePage';
+import AdminVehiclesPage from './pages/AdminVehiclesPage';
+import AdminCustomersPage from './pages/AdminCustomersPage';
+import AdminStationsPage from './pages/AdminStationsPage';
+import AdminEmployeesPage from './pages/AdminEmployeesPage';
 
 const queryClient = new QueryClient();
 
@@ -25,8 +31,9 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/search" element={<CarSearchPage />} />
-          <Route path="/rental-points" element={<RentalPoints />} />
-          <Route path="/bookings" element={<Bookings />} />
+          <Route path="/Stations" element={<StationsPage />} />
+          <Route path="/Bookings" element={<Bookings />} />
+          <Route path="/vehicle/:id" element={<VehicleDetailsPage />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
@@ -34,6 +41,11 @@ const App = () => (
           <Route path="*" element={<NotFound />} />
            <Route path="/admin" element={<AdminLayout />}>
            <Route path="dashboard" element={<AdminDashboardPage />} />
+            <Route path="revenue" element={<AdminRevenuePage />} />
+            <Route path="vehicles" element={<AdminVehiclesPage />} />
+            <Route path="customers" element={<AdminCustomersPage />} />
+            <Route path="stations" element={<AdminStationsPage />} />
+            <Route path="employees" element={<AdminEmployeesPage />} />
 
           </Route>
         </Routes>

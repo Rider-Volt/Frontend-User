@@ -266,7 +266,6 @@ const CarSearchPage = () => {
               <EVCard
                 key={car.id}
                 {...car}
-                onBookingSubmit={handleBookingSubmit}
               />
             ))
           ) : (

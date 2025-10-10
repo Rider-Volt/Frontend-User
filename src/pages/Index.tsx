@@ -2,8 +2,8 @@ import React, { useState, useEffect } from "react";
 import { Car, Shield, Ticket, HeartHandshake } from "lucide-react";
 import Navbar from "../components/heroUi/Navbar";
 import SearchBar, { VehicleType } from "../components/heroUi/Searchbar";
+import EVCard from "../components/heroUi/EVCard";
 import { useNavigate } from "react-router-dom";
-import EVCard from "@/components/heroUi/EVCard"; // 👉 import EVCard mới
 import { groupCarsByType, Car as CarType } from "@/services/carServices";
 
 const Index: React.FC = () => {
@@ -195,7 +195,6 @@ const Index: React.FC = () => {
                     <EVCard
                       key={car.id}
                       {...car}
-                      onBookingSubmit={handleBookingSubmit}
                     />
                   ))}
                 </div>

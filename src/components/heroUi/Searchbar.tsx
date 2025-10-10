@@ -4,7 +4,7 @@ import { Icon } from "@iconify/react";
 import { DateValue } from "@internationalized/date";
 
 // ================== Types ==================
-export type VehicleType = "" | "xe máy điện" | "ô tô điện" | "mô tô điện";
+export type VehicleType = "" | "xe máy điện" | "ô tô điện";
 
 interface SearchBarProps {
   onSubmit: (params: {
@@ -112,18 +112,18 @@ export default function SearchBar({ onSubmit }: SearchBarProps) {
             </label>
             <Select
               placeholder="Chọn loại xe"
-              selectedKeys={vehicleType ? [vehicleType] : []}
+              selectionMode="single"
+              selectedKeys={[vehicleType === "" ? "all" : vehicleType]}
               onSelectionChange={(keys) => {
-                const selectedKey = Array.from(keys)[0]?.toString() as VehicleType;
-                setVehicleType(selectedKey || "");
+                const raw = Array.from(keys)[0]?.toString();
+                setVehicleType(raw === "all" ? "" : (raw as VehicleType));
               }}
               variant="bordered"
               size="lg"
             >
-              <SelectItem key="">Tất cả</SelectItem>
+              <SelectItem key="all">tất cả</SelectItem>
               <SelectItem key="xe máy điện">Xe máy điện</SelectItem>
               <SelectItem key="ô tô điện">Ô tô điện</SelectItem>
-              <SelectItem key="mô tô điện">Mô tô điện</SelectItem>
             </Select>
           </div>
 

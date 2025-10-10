@@ -49,12 +49,10 @@ const Navbar: React.FC<NavbarProps> = ({ isLoggedIn, username }) => {
           <Link to="/search" className="text-foreground hover:text-primary font-medium">
             Tìm xe
           </Link>
-          <Link to="/rental-points" className="text-foreground hover:text-primary font-medium">
+          <Link to="/Stations" className="text-foreground hover:text-primary font-medium">
             Điểm thuê
           </Link>
-          <Link to="/cars" className="text-foreground hover:text-primary font-medium">
-            Lịch sử đặt xe
-          </Link>
+          
         </nav>
 
         {/* User actions */}
@@ -88,7 +86,7 @@ const Navbar: React.FC<NavbarProps> = ({ isLoggedIn, username }) => {
                 </DropdownMenuItem>
 
                 <DropdownMenuItem
-                  onClick={() => navigate("/cars")}
+                  onClick={() => navigate("/Bookings")}
                   className="cursor-pointer hover:bg-accent/20"
                 >
                   Lịch sử đặt xe

@@ -22,3 +22,5 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+\n.env.local\n.env*
+\n.env.local\n.env*

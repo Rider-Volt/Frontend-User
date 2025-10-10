@@ -1,4 +1,4 @@
-import { Input } from "@/components/heroUi";
+import { Input } from "@/components/ui/input";
 import { LucideIcon } from "lucide-react";
 
 interface AuthInputProps {

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Input } from "@/components/heroUi";
+import { Input } from "@/components/ui/input";
 import { Lock, Eye, EyeOff } from "lucide-react";
 
 interface PasswordInputProps {

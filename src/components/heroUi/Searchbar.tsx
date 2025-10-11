@@ -1,7 +1,23 @@
-import React from "react";
-import { Input, Select, SelectItem, Button, DatePicker } from "@heroui/react";
-import { Icon } from "@iconify/react";
-import { DateValue } from "@internationalized/date";
+import { useMemo, useState } from "react";
+import { format } from "date-fns";
+import { CalendarIcon, CarFront, MapPin, Search } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Input } from "@/components/ui/input";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
 // ================== Types ==================
 export type VehicleType = "" | "xe máy điện" | "ô tô điện";
@@ -15,32 +31,48 @@ interface SearchBarProps {
   }) => void;
 }
 
-// ================== Helper ==================
-function formatDate(date: DateValue | null): string {
-  if (!date) return "";
-  const jsDate = date.toDate("UTC");
-  return new Intl.DateTimeFormat("vi-VN").format(jsDate);
-}
+const DATE_FORMAT = "dd/MM/yyyy";
+
+// ================== Helpers ==================
+const formatDateForDisplay = (date: Date | undefined) =>
+  date ? format(date, DATE_FORMAT) : undefined;
+
+const formatDateForSubmit = (date: Date | undefined) =>
+  date
+    ? new Intl.DateTimeFormat("vi-VN", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      }).format(date)
+    : "";
 
 // ================== Component ==================
 export default function SearchBar({ onSubmit }: SearchBarProps) {
-  const [location, setLocation] = React.useState("");
-  const [startDate, setStartDate] = React.useState<DateValue | null>(null);
-  const [endDate, setEndDate] = React.useState<DateValue | null>(null);
-  const [vehicleType, setVehicleType] = React.useState<VehicleType>("");
+  const [location, setLocation] = useState("");
+  const [startDate, setStartDate] = useState<Date | undefined>();
+  const [endDate, setEndDate] = useState<Date | undefined>();
+  const [vehicleType, setVehicleType] = useState<VehicleType>("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [startOpen, setStartOpen] = useState(false);
+  const [endOpen, setEndOpen] = useState(false);
+
+  const endDateDisabled = useMemo(
+    () => (date: Date) => (startDate ? date < startDate : false),
+    [startDate],
+  );
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    if (startDate && endDate && endDate.compare(startDate) < 0) {
+    if (startDate && endDate && endDate < startDate) {
       alert("Ngày trả xe không được nhỏ hơn ngày nhận xe!");
       return;
     }
 
     onSubmit({
       location,
-      startDate: formatDate(startDate),
-      endDate: formatDate(endDate),
+      startDate: formatDateForSubmit(startDate),
+      endDate: formatDateForSubmit(endDate),
       vehicleType,
     });
   };
@@ -53,88 +85,133 @@ export default function SearchBar({ onSubmit }: SearchBarProps) {
           className="grid grid-cols-1 md:grid-cols-5 gap-6 items-end"
         >
           {/* Địa điểm */}
-          <div>
-            <label className="text-sm font-medium text-gray-700 mb-2 block">
+          <div className="space-y-2">
+            <label
+              htmlFor="search-location"
+              className="text-sm font-medium text-gray-700 flex items-center gap-2"
+            >
+              <MapPin className="h-4 w-4 text-primary" />
               Địa điểm
             </label>
             <Input
+              id="search-location"
               placeholder="Ví dụ: Quận 1, Quận 2"
               value={location}
-              onValueChange={setLocation}
-              variant="bordered"
-              size="lg"
+              onChange={(event) => setLocation(event.target.value)}
             />
           </div>
 
           {/* Ngày nhận xe */}
-          <div>
-            <label className="text-sm font-medium text-gray-700 mb-2 block">
+          <div className="space-y-2">
+            <span className="text-sm font-medium text-gray-700 flex items-center gap-2">
+              <CalendarIcon className="h-4 w-4 text-primary" />
               Ngày nhận xe
-            </label>
-            <DatePicker
-              aria-label="Ngày nhận xe"
-              value={startDate}
-              onChange={setStartDate}
-              variant="bordered"
-              size="lg"
-              granularity="day"
-              popoverProps={{
-                portalContainer: document.body,
-                classNames: { content: "z-[9999]" },
-              }}
-            />
+            </span>
+            <Popover open={startOpen} onOpenChange={setStartOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !startDate && "text-muted-foreground",
+                  )}
+                >
+                  {startDate ? (
+                    formatDateForDisplay(startDate)
+                  ) : (
+                    <span>Chọn ngày</span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={startDate}
+                  onSelect={(value) => {
+                    setStartDate(value || undefined);
+                    if (value && endDate && endDate < value) {
+                      setEndDate(value);
+                    }
+                    setStartOpen(false);
+                  }}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
           </div>
 
           {/* Ngày trả xe */}
-          <div>
-            <label className="text-sm font-medium text-gray-700 mb-2 block">
+          <div className="space-y-2">
+            <span className="text-sm font-medium text-gray-700 flex items-center gap-2">
+              <CalendarIcon className="h-4 w-4 text-primary" />
               Ngày trả xe
-            </label>
-            <DatePicker
-              aria-label="Ngày trả xe"
-              value={endDate}
-              onChange={setEndDate}
-              variant="bordered"
-              size="lg"
-              granularity="day"
-              minValue={startDate || undefined}
-              popoverProps={{
-                portalContainer: document.body,
-                classNames: { content: "z-[9999]" },
-              }}
-            />
+            </span>
+            <Popover open={endOpen} onOpenChange={setEndOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !endDate && "text-muted-foreground",
+                  )}
+                >
+                  {endDate ? (
+                    formatDateForDisplay(endDate)
+                  ) : (
+                    <span>Chọn ngày</span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={endDate}
+                  onSelect={(value) => {
+                    if (value && startDate && value < startDate) {
+                      return;
+                    }
+                    setEndDate(value || undefined);
+                    if (value) {
+                      setEndOpen(false);
+                    }
+                  }}
+                  disabled={endDateDisabled}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
           </div>
 
           {/* Loại xe */}
-          <div>
-            <label className="text-sm font-medium text-gray-700 mb-2 block">
+          <div className="space-y-2">
+            <span className="text-sm font-medium text-gray-700 flex items-center gap-2">
+              <CarFront className="h-4 w-4 text-primary" />
               Loại xe
-            </label>
+            </span>
             <Select
-              placeholder="Chọn loại xe"
-              selectionMode="single"
-              selectedKeys={[vehicleType === "" ? "all" : vehicleType]}
-              onSelectionChange={(keys) => {
-                const raw = Array.from(keys)[0]?.toString();
-                setVehicleType(raw === "all" ? "" : (raw as VehicleType));
-              }}
-              variant="bordered"
-              size="lg"
+              value={vehicleType || "all"}
+              onValueChange={(value) =>
+                setVehicleType(value === "all" ? "" : (value as VehicleType))
+              }
             >
-              <SelectItem key="all">tất cả</SelectItem>
-              <SelectItem key="xe máy điện">Xe máy điện</SelectItem>
-              <SelectItem key="ô tô điện">Ô tô điện</SelectItem>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Chọn loại xe" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tất cả</SelectItem>
+                <SelectItem value="xe máy điện">Xe máy điện</SelectItem>
+                <SelectItem value="ô tô điện">Ô tô điện</SelectItem>
+              </SelectContent>
             </Select>
           </div>
 
           {/* Nút tìm */}
-          <div>
+          <div className="flex items-end">
             <Button
               type="submit"
-              color="primary"
-              className="w-full h-12 font-medium gap-2"
+              className="w-full h-12 font-medium gap-2 bg-primary hover:bg-accent text-primary-foreground"
             >
-              <Icon icon="lucide:search" className="w-5 h-5" />
+              <Search className="w-5 h-5" />
               Tìm
             </Button>
           </div>

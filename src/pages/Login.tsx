@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { login } from "@/services/authService";
+import RecaptchaV2 from "@/components/RecaptchaV2";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -17,13 +18,24 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      await login(email, password);
+      if (!recaptchaToken) {
+        toast({
+          title: "Vui lòng xác minh reCAPTCHA",
+          description: "Hãy tích vào ô Tôi không phải người máy",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      await login(email, password, recaptchaToken || undefined);
 
       toast({
         title: "Đăng nhập thành công",
@@ -99,7 +111,12 @@ const Login = () => {
                 </div>
               </div>
 
-              <Button type="submit" className="w-full" disabled={isLoading}>
+              {/* reCAPTCHA v2 Checkbox */}
+              <div className="flex justify-center">
+                <RecaptchaV2 onVerify={setRecaptchaToken} />
+              </div>
+
+              <Button type="submit" className="w-full" disabled={isLoading || !recaptchaToken}>
                 {isLoading ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />

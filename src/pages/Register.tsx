@@ -8,6 +8,8 @@ import { Separator } from "@/components/ui/separator";
 import { Car, Mail, Lock, Eye, EyeOff, User, Phone } from "lucide-react";
 import { FcGoogle } from "react-icons/fc";
 import { FaFacebook } from "react-icons/fa";
+import RecaptchaV2 from "@/components/RecaptchaV2";
+import { register as registerApi } from "@/services/authService";
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -20,6 +22,7 @@ const Register = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
 
   const navigate = useNavigate();
 
@@ -47,30 +50,22 @@ const Register = () => {
 
     setLoading(true);
     try {
-      const response = await fetch(
-        "https://ridervolt-761a9cacc040.herokuapp.com/api/register",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            fullName: formData.fullName,
-            email: formData.email,
-            phone: formData.phone,
-            password: formData.password
-          })
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        alert(`Đăng ký thất bại: ${data.message || "Lỗi server"}`);
-      } else {
-        alert("Đăng ký thành công!");
-        navigate("/login");
+      if (!recaptchaToken) {
+        alert("Vui lòng tích vào ô reCAPTCHA");
+        setLoading(false);
+        return;
       }
+
+      const data = await registerApi({
+        fullName: formData.fullName,
+        email: formData.email,
+        phone: formData.phone,
+        password: formData.password,
+        recaptchaToken: recaptchaToken,
+      });
+
+      alert(data.message || "Đăng ký thành công!");
+      navigate("/login");
     } catch (error) {
       console.error("Lỗi khi đăng ký:", error);
       alert("Không thể kết nối đến server!");
@@ -213,12 +208,17 @@ const Register = () => {
                 </div>
               </div>
 
+              {/* reCAPTCHA v2 Checkbox */}
+              <div className="flex justify-center">
+                <RecaptchaV2 onVerify={setRecaptchaToken} />
+              </div>
+
               {/* Submit */}
               <Button
                 type="submit"
                 className="w-full"
                 variant="electric"
-                disabled={loading}
+                disabled={loading || !recaptchaToken}
               >
                 {loading ? "Đang xử lý..." : "Đăng ký"}
               </Button>

@@ -20,7 +20,7 @@ import {
 import { cn } from "@/lib/utils";
 
 // ================== Types ==================
-export type VehicleType = "" | "xe máy điện" | "ô tô điện";
+export type VehicleType = "" | "E-Scooter" | "E-Bike" | "E-Car";
 
 interface SearchBarProps {
   onSubmit: (params: {
@@ -29,6 +29,12 @@ interface SearchBarProps {
     endDate: string;
     vehicleType: VehicleType;
   }) => void;
+  defaultValues?: {
+    location?: string;
+    startDate?: string; // dd/MM/yyyy (vi-VN) or yyyy-MM-dd
+    endDate?: string;   // dd/MM/yyyy (vi-VN) or yyyy-MM-dd
+    vehicleType?: VehicleType;
+  };
 }
 
 const DATE_FORMAT = "dd/MM/yyyy";
@@ -47,7 +53,7 @@ const formatDateForSubmit = (date: Date | undefined) =>
     : "";
 
 // ================== Component ==================
-export default function SearchBar({ onSubmit }: SearchBarProps) {
+export default function SearchBar({ onSubmit, defaultValues }: SearchBarProps) {
   const [location, setLocation] = useState("");
   const [startDate, setStartDate] = useState<Date | undefined>();
   const [endDate, setEndDate] = useState<Date | undefined>();
@@ -60,6 +66,36 @@ export default function SearchBar({ onSubmit }: SearchBarProps) {
     () => (date: Date) => (startDate ? date < startDate : false),
     [startDate],
   );
+
+  // Parse date from dd/MM/yyyy or yyyy-MM-dd to Date
+  const parseDateInput = (s?: string): Date | undefined => {
+    if (!s) return undefined;
+    // yyyy-MM-dd
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+      const [y, m, d] = s.split("-").map(Number);
+      const dt = new Date(y, (m || 1) - 1, d || 1);
+      return Number.isFinite(dt.getTime()) ? dt : undefined;
+    }
+    // dd/MM/yyyy
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) {
+      const [d, m, y] = s.split("/").map(Number);
+      const dt = new Date(y || 0, (m || 1) - 1, d || 1);
+      return Number.isFinite(dt.getTime()) ? dt : undefined;
+    }
+    const dt = new Date(s);
+    return Number.isFinite(dt.getTime()) ? dt : undefined;
+  };
+
+  // Prefill from defaultValues when provided
+  useMemo(() => {
+    if (!defaultValues) return;
+    if (defaultValues.location !== undefined) setLocation(defaultValues.location);
+    if (defaultValues.vehicleType !== undefined) setVehicleType(defaultValues.vehicleType);
+    const s = parseDateInput(defaultValues.startDate);
+    const e = parseDateInput(defaultValues.endDate);
+    if (s) setStartDate(s);
+    if (e) setEndDate(e);
+  }, [defaultValues?.location, defaultValues?.vehicleType, defaultValues?.startDate, defaultValues?.endDate]);
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -199,8 +235,9 @@ export default function SearchBar({ onSubmit }: SearchBarProps) {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tất cả</SelectItem>
-                <SelectItem value="xe máy điện">Xe máy điện</SelectItem>
-                <SelectItem value="ô tô điện">Ô tô điện</SelectItem>
+                <SelectItem value="E-Scooter">E-Scooter</SelectItem>
+                <SelectItem value="E-Bike">E-Bike</SelectItem>
+                <SelectItem value="E-Car">E-Car</SelectItem>
               </SelectContent>
             </Select>
           </div>

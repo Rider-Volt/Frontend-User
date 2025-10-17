@@ -1,50 +1,39 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Battery, Zap, MapPin, Calendar as CalendarIcon, Clock,Users,Settings,Fuel,Leaf,ArrowLeft,Share2,Crown,AlertCircle,CheckCircle} from "lucide-react";
-import { format } from "date-fns";
+import { Battery, Zap, MapPin, Calendar as CalendarIcon, Clock,Users,Settings,Fuel,Leaf,ArrowLeft,Share2,Crown,AlertCircle,CheckCircle,CreditCard} from "lucide-react";
+import { differenceInCalendarDays, format, addDays, startOfDay, endOfDay } from "date-fns";
 import { vi } from "date-fns/locale";
 import Navbar from "@/components/heroUi/Navbar";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"; // Nếu bạn dùng Radix hoặc custom dialog
-
-interface Vehicle {
-  id: number;
-  name: string;
-  type: string;
-  batteryLevel: number;
-  range: number;
-  pricePerDay: number;
-  location: string;
-  image: string;
-  available: boolean;
-  features?: {
-    seats: number;
-    transmission: string;
-    fuel: string;
-    consumption: string;
-  };
-  description?: string;
-  fullAddress?: string;
-}
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"; // Nếu bạn dùng Radix hoặc custom dialog
+import { useToast } from "@/hooks/use-toast";
+import { createBooking, appendBookingHistory, StoredBooking } from "@/services/bookingService";
+import { getCurrentUser, fetchProfileFromAPI } from "@/services/authService";
+import { VehicleData } from "@/data/vehicles";
+import { fetchVehicleById } from "@/services/vehicleService";
+import { DateTimePicker } from "@/components/ui/date-time-picker";
 
 const VehicleDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [vehicle, setVehicle] = useState<Vehicle | null>(null);
+  const location = useLocation();
+  const [vehicle, setVehicle] = useState<VehicleData | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [username, setUsername] = useState("");
+  const { toast } = useToast();
+  const [loadingVehicle, setLoadingVehicle] = useState(true);
+  const [vehicleError, setVehicleError] = useState<string | null>(null);
   
   // Booking form state
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [selectedDuration, setSelectedDuration] = useState("4");
+  const [startDate, setStartDate] = useState<Date | null>(null);
+  const [endDate, setEndDate] = useState<Date | null>(null);
   const [pickupOption, setPickupOption] = useState("self");
-  const [paymentMethod, setPaymentMethod] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("credit-card");
+  const [isBooking, setIsBooking] = useState(false);
 
   // Modal state
   const [showInsuranceModal, setShowInsuranceModal] = useState(false);
@@ -65,322 +54,288 @@ const VehicleDetailsPage = () => {
   }, []);
 
   useEffect(() => {
-    // Mock data - in real app, fetch from API using id
-    const mockVehicles: Vehicle[] = [
-      {
-        id: 1,
-        name: "VinFast VF e34",
-        type: "Ô tô điện",
-        batteryLevel: 85,
-        range: 300,
-        pricePerDay: 600000,
-        location: "Quận 1, TP.HCM",
-        image: "/images/imagecar/e34.jpg",
-        available: true,
-        features: {
-          seats: 5,
-          transmission: "Số tự động",
-          fuel: "Điện",
-          consumption: "0l/100km"
-        },
-        description: "Xe điện cao cấp với thiết kế hiện đại, phù hợp cho việc di chuyển trong thành phố và các chuyến đi dài. Được trang bị công nghệ tiên tiến và tiết kiệm năng lượng.",
-        fullAddress: "Quận 1, TP.HCM"
-      },
-      {
-        id: 2,
-        name: "VinFast VF 3",
-        type: "Ô tô điện",
-        batteryLevel: 92,
-        range: 450,
-        pricePerDay: 1200000,
-        location: "Quận 2, TP.HCM",
-        image: "/images/imagecar/vf3.jpg",
-        available: true,
-        features: {
-          seats: 5,
-          transmission: "Số tự động",
-          fuel: "Điện",
-          consumption: "0l/100km"
-        },
-        description: "VinFast VF 3 là mẫu xe điện thông minh với công nghệ AI tiên tiến, phù hợp cho gia đình hiện đại.",
-        fullAddress: "123 Đường Nguyễn Văn Cừ, Quận 2, TP.HCM"
-      },
-      {
-        id: 3,
-        name: "VinFast VF 5",
-        type: "Ô tô điện",
-        batteryLevel: 78,
-        range: 380,
-        pricePerDay: 960000,
-        location: "Quận 7, TP.HCM",
-        image: "/images/imagecar/vf5.jpg",
-        available: false,
-        features: {
-          seats: 7,
-          transmission: "Số tự động",
-          fuel: "Điện",
-          consumption: "0l/100km"
-        },
-        description: "VinFast VF 5 là SUV điện 7 chỗ với không gian rộng rãi, lý tưởng cho gia đình đông người.",
-        fullAddress: "456 Đường Huỳnh Tấn Phát, Quận 7, TP.HCM"
-      },
-      {
-        id: 4,
-        name: "VinFast VF 6",
-        type: "Ô tô điện",
-        batteryLevel: 88,
-        range: 420,
-        pricePerDay: 1080000,
-        location: "Quận 3, TP.HCM",
-        image: "/images/imagecar/vf6.jpg",
-        available: true,
-        features: {
-          seats: 5,
-          transmission: "Số tự động",
-          fuel: "Điện",
-          consumption: "0l/100km"
-        },
-        description: "VinFast VF 6 với thiết kế thể thao và hiệu suất cao, phù hợp cho những người yêu thích tốc độ.",
-        fullAddress: "789 Đường Võ Văn Tần, Quận 3, TP.HCM"
-      },
-      {
-        id: 5,
-        name: "VinFast VF 7",
-        type: "Ô tô điện",
-        batteryLevel: 90,
-        range: 400,
-        pricePerDay: 800000,
-        location: "Quận 1, TP.HCM",
-        image: "/images/imagecar/vf7.jpg",
-        available: true,
-        features: {
-          seats: 5,
-          transmission: "Số tự động",
-          fuel: "Điện",
-          consumption: "0l/100km"
-        },
-        description: "VinFast VF 7 là sedan điện sang trọng với nội thất cao cấp và công nghệ tiên tiến.",
-        fullAddress: "321 Đường Lê Lợi, Quận 1, TP.HCM"
-      },
-      {
-        id: 6,
-        name: "VinFast VF 8",
-        type: "Ô tô điện",
-        batteryLevel: 95,
-        range: 500,
-        pricePerDay: 1500000,
-        location: "Quận 1, TP.HCM",
-        image: "/images/imagecar/vf8.jpg",
-        available: true,
-        features: {
-          seats: 5,
-          transmission: "Số tự động",
-          fuel: "Điện",
-          consumption: "0l/100km"
-        },
-        description: "VinFast VF 8 là flagship với công nghệ AI và tự lái, đại diện cho tương lai của xe điện.",
-        fullAddress: "654 Đường Nguyễn Huệ, Quận 1, TP.HCM"
-      },
-      {
-        id: 7,
-        name: "VinFast VF 9",
-        type: "Ô tô điện",
-        batteryLevel: 88,
-        range: 480,
-        pricePerDay: 1800000,
-        location: "Quận 2, TP.HCM",
-        image: "/images/imagecar/vf9.jpg",
-        available: true,
-        features: {
-          seats: 7,
-          transmission: "Số tự động",
-          fuel: "Điện",
-          consumption: "0l/100km"
-        },
-        description: "VinFast VF 9 là SUV điện cao cấp với không gian rộng rãi và công nghệ tiên tiến nhất.",
-        fullAddress: "987 Đường Điện Biên Phủ, Quận 2, TP.HCM"
-      },
-      {
-        id: 8,
-        name: "VinFast Feliz",
-        type: "Xe máy điện",
-        batteryLevel: 90,
-        range: 80,
-        pricePerDay: 150000,
-        location: "Quận 1, TP.HCM",
-        image: "/images/imagecar/feliz.jpg",
-        available: true,
-        features: {
-          seats: 2,
-          transmission: "Tự động",
-          fuel: "Điện",
-          consumption: "0l/100km"
-        },
-        description: "VinFast Feliz là xe máy điện thông minh với thiết kế hiện đại, phù hợp cho di chuyển trong thành phố.",
-        fullAddress: "147 Đường Pasteur, Quận 1, TP.HCM"
-      },
-      {
-        id: 9,
-        name: "VinFast Klara Neo",
-        type: "Xe máy điện",
-        batteryLevel: 95,
-        range: 70,
-        pricePerDay: 120000,
-        location: "Quận 2, TP.HCM",
-        image: "/images/imagecar/klaraneo.jpg",
-        available: true,
-        features: {
-          seats: 2,
-          transmission: "Tự động",
-          fuel: "Điện",
-          consumption: "0l/100km"
-        },
-        description: "VinFast Klara Neo là xe máy điện thế hệ mới với pin lithium-ion và công nghệ thông minh.",
-        fullAddress: "258 Đường Cách Mạng Tháng 8, Quận 2, TP.HCM"
-      },
-      // Bổ sung các mẫu xe máy điện dùng ở trang Index/Search (IDs 11-15)
-      {
-        id: 11,
-        name: "VinFast Feliz",
-        type: "Xe máy điện",
-        batteryLevel: 90,
-        range: 80,
-        pricePerDay: 150000,
-        location: "Quận 1, TP.HCM",
-        image: "/images/imagecar/feliz.jpg",
-        available: true,
-        features: {
-          seats: 2,
-          transmission: "Tự động",
-          fuel: "Điện",
-          consumption: "0l/100km"
-        },
-        description: "VinFast Feliz là xe máy điện thông minh với thiết kế hiện đại, phù hợp cho di chuyển trong thành phố.",
-        fullAddress: "147 Đường Pasteur, Quận 1, TP.HCM"
-      },
-      {
-        id: 12,
-        name: "VinFast Klara Neo",
-        type: "Xe máy điện",
-        batteryLevel: 95,
-        range: 70,
-        pricePerDay: 120000,
-        location: "Quận 2, TP.HCM",
-        image: "/images/imagecar/klaraneo.jpg",
-        available: true,
-        features: {
-          seats: 2,
-          transmission: "Tự động",
-          fuel: "Điện",
-          consumption: "0l/100km"
-        },
-        description: "VinFast Klara Neo là xe máy điện thế hệ mới với pin lithium-ion và công nghệ thông minh.",
-        fullAddress: "258 Đường Cách Mạng Tháng 8, Quận 2, TP.HCM"
-      },
-      {
-        id: 13,
-        name: "VinFast Evo Neo",
-        type: "Xe máy điện",
-        batteryLevel: 85,
-        range: 75,
-        pricePerDay: 130000,
-        location: "Quận 1, TP.HCM",
-        image: "/images/imagecar/evoneo.jpg",
-        available: true,
-        features: {
-          seats: 2,
-          transmission: "Tự động",
-          fuel: "Điện",
-          consumption: "0l/100km"
-        },
-        description: "VinFast Evo Neo nhỏ gọn, tiết kiệm và phù hợp đi lại hằng ngày trong nội đô.",
-        fullAddress: "12 Nguyễn Thị Minh Khai, Quận 1, TP.HCM"
-      },
-      {
-        id: 14,
-        name: "VinFast Evo Grand",
-        type: "Xe máy điện",
-        batteryLevel: 88,
-        range: 85,
-        pricePerDay: 140000,
-        location: "Quận 3, TP.HCM",
-        image: "/images/imagecar/evogrand.jpg",
-        available: true,
-        features: {
-          seats: 2,
-          transmission: "Tự động",
-          fuel: "Điện",
-          consumption: "0l/100km"
-        },
-        description: "VinFast Evo Grand có thiết kế hiện đại, vận hành êm ái và bền bỉ.",
-        fullAddress: "45 Võ Văn Tần, Quận 3, TP.HCM"
-      },
-      {
-        id: 15,
-        name: "VinFast Vento Neo",
-        type: "Xe máy điện",
-        batteryLevel: 92,
-        range: 90,
-        pricePerDay: 150000,
-        location: "Quận 1, TP.HCM",
-        image: "/images/imagecar/ventoneo.jpg",
-        available: true,
-        features: {
-          seats: 2,
-          transmission: "Tự động",
-          fuel: "Điện",
-          consumption: "0l/100km"
-        },
-        description: "VinFast Vento Neo cao cấp với hiệu năng tốt, phù hợp di chuyển linh hoạt.",
-        fullAddress: "90 Lê Lợi, Quận 1, TP.HCM"
+    let cancelled = false;
+    const loadVehicle = async () => {
+      setLoadingVehicle(true);
+      setVehicleError(null);
+
+      const stateData = (location.state as { vehicle?: VehicleData } | undefined)?.vehicle;
+      if (stateData) {
+        setVehicle(stateData);
+        setLoadingVehicle(false);
+        return;
       }
-    ];
-    
-    const vehicleId = parseInt(id || "1");
-    const foundVehicle = mockVehicles.find(v => v.id === vehicleId);
-    
-    if (foundVehicle) {
-      setVehicle(foundVehicle);
-    } else {
-      setVehicle(null);
+
+      const vehicleId = parseInt(id || "", 10);
+      if (Number.isNaN(vehicleId)) {
+        setVehicle(null);
+        setVehicleError("ID xe không hợp lệ");
+        setLoadingVehicle(false);
+        return;
+      }
+
+      try {
+        const data = await fetchVehicleById(vehicleId);
+        if (!cancelled) {
+          setVehicle(data);
+          if (!data) {
+            setVehicleError("Không tìm thấy thông tin xe");
+          }
+        }
+      } catch (err: any) {
+        if (!cancelled) {
+          setVehicle(null);
+          setVehicleError(err?.message || "Không tải được thông tin xe");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingVehicle(false);
+        }
+      }
+    };
+
+    loadVehicle();
+    return () => {
+      cancelled = true;
+    };
+  }, [id, location.state]);
+
+  // Pricing derived from backend
+  const pricePerDay =
+    vehicle && vehicle.pricePerDay && vehicle.pricePerDay > 0
+      ? vehicle.pricePerDay
+      : 600000;
+  const rentalDurationDays =
+    startDate && endDate ? differenceInCalendarDays(endDate, startDate) : 0;
+  const minDurationDays = 1;
+  const isEndAfterStart = !startDate || !endDate || rentalDurationDays > 0;
+  const isDurationValid = !startDate || !endDate || rentalDurationDays >= minDurationDays;
+
+  const isVehicleAvailable =
+    !!vehicle &&
+    (vehicle.status ?? "AVAILABLE") === "AVAILABLE" &&
+    vehicle.available !== false;
+
+  const inferredType = vehicle?.type?.toLowerCase() || "";
+  const isCar =
+    inferredType.includes("ô tô") ||
+    inferredType.includes("car") ||
+    inferredType.includes("suv");
+  const depositAmount = isCar ? 5_000_000 : 1_000_000;
+
+  const chargeableDays = rentalDurationDays > 0 ? rentalDurationDays : 0;
+
+  const rentalAmount =
+    chargeableDays > 0 ? Math.round(pricePerDay * chargeableDays) : 0;
+  const totalPayable =
+    rentalAmount > 0 ? rentalAmount + depositAmount : depositAmount;
+
+  const maxAdvanceDays = 7;
+  const advanceLimitDate = addDays(new Date(), maxAdvanceDays);
+  const advanceLimitExceeded = startDate
+    ? startDate > advanceLimitDate
+    : false;
+
+  const formatCurrency = (value: number) =>
+    value.toLocaleString("vi-VN", { maximumFractionDigits: 0 }) + "₫";
+
+  if (loadingVehicle) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Navbar isLoggedIn={isLoggedIn} username={username} />
+        <div className="flex-1 flex items-center justify-center">
+          <p>Đang tải thông tin xe…</p>
+        </div>
+      </div>
+    );
+  }
+
+  const mainImage = (vehicle.image ?? vehicle.imageUrl ?? "").trim();
+
+  if (!vehicle) {
+    return (
+      <div className="min-h-screen flex flex-col bg-background">
+        <Navbar isLoggedIn={isLoggedIn} username={username} />
+        <div className="flex-1 flex flex-col items-center justify-center gap-4 px-4 text-center">
+          <p>{vehicleError || "Không tìm thấy thông tin xe."}</p>
+          <Button variant="outline" onClick={() => navigate(-1)}>
+            Quay lại
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const handleBooking = async () => {
+    if (!vehicle) {
+      toast({
+        title: "Không tìm thấy thông tin xe",
+        description: "Vui lòng thử lại sau.",
+        variant: "destructive",
+      });
+      return;
     }
-  }, [id]);
 
-  // Dynamic pricing based on vehicle price
-  const basePrice = vehicle?.pricePerDay || 600000;
-  const pricingOptions = [
-    
-    { 
-      duration: "8", 
-      price: Math.round(basePrice * 1.1), 
-      originalPrice: Math.round(basePrice * 1.25), 
-      discount: 12 
-    },   
-    { 
-      duration: "24", 
-      price: Math.round(basePrice * 1.6), 
-      originalPrice: Math.round(basePrice * 1.8), 
-      discount: 12 
-    },
-  ];
+    if (!startDate || !endDate) {
+      toast({
+        title: "Thiếu thời gian thuê",
+        description: "Hãy chọn đầy đủ thời gian bắt đầu và kết thúc.",
+        variant: "destructive",
+      });
+      return;
+    }
 
-  const selectedPricing = pricingOptions.find(p => p.duration === selectedDuration) || pricingOptions[0];
+    if (!isEndAfterStart) {
+      toast({
+        title: "Thời gian không hợp lệ",
+        description: "Ngày kết thúc phải sau ngày bắt đầu.",
+        variant: "destructive",
+      });
+      return;
+    }
 
-  const handleBooking = () => {
-    if (startDate && endDate && paymentMethod && vehicle) {
-      const bookingData = {
-        vehicleId: vehicle.id,
-        startDate: new Date(startDate),
-        endDate: new Date(endDate),
-        duration: parseInt(selectedDuration),
-        totalPrice: selectedPricing.price,
-        pickupLocation: pickupOption === "self" ? vehicle.fullAddress : "The Beverly Solari, 39693 Phước Thiện, Long Bình, Quận 9, Hồ Chí Minh",
+    if (!isDurationValid) {
+      toast({
+        title: "Thời gian thuê quá ngắn",
+        description: `Vui lòng chọn thời gian thuê tối thiểu ${minDurationDays} ngày.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!isVehicleAvailable) {
+      toast({
+        title: "Xe không khả dụng",
+        description: "Xe đang tạm dừng cho thuê, vui lòng chọn xe khác.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (advanceLimitExceeded) {
+      toast({
+        title: "Ngày thuê không hợp lệ",
+        description: `Bạn chỉ có thể đặt trước tối đa ${maxAdvanceDays} ngày so với hiện tại.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    let currentUser = getCurrentUser();
+    const token = localStorage.getItem("token") || "";
+
+    if (!token) {
+      toast({
+        title: "Cần đăng nhập",
+        description: "Bạn hãy đăng nhập để tiếp tục đặt xe.",
+      });
+      navigate("/login");
+      return;
+    }
+
+    if (!currentUser) {
+      try {
+        currentUser = await fetchProfileFromAPI();
+      } catch (error) {
+        toast({
+          title: "Không lấy được thông tin người dùng",
+          description: "Vui lòng đăng nhập lại.",
+          variant: "destructive",
+        });
+        navigate("/login");
+        return;
+      }
+    }
+
+    let userIdValue = currentUser?.id ?? currentUser?.userId;
+
+    if (!userIdValue || Number.isNaN(Number(userIdValue))) {
+      try {
+        const refreshed = await fetchProfileFromAPI();
+        currentUser = refreshed;
+        userIdValue = refreshed.id ?? refreshed.userId;
+      } catch (error) {
+        toast({
+          title: "Không lấy được thông tin người dùng",
+          description: "Vui lòng đăng nhập lại.",
+          variant: "destructive",
+        });
+        navigate("/login");
+        return;
+      }
+    }
+
+    const userId = Number(userIdValue);
+
+    if (!userId || Number.isNaN(userId)) {
+      toast({
+        title: "Không xác định được tài khoản",
+        description: "Thông tin người dùng không hợp lệ.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const vehicleModel = vehicle.model || vehicle.name;
+    const pickupLocation =
+      pickupOption === "self"
+        ? vehicle.fullAddress || vehicle.location
+        : "Giao tận nơi - sẽ liên hệ để xác nhận địa điểm";
+
+  const formatForApiStart = (date: Date) => format(startOfDay(date), "yyyy-MM-dd'T'HH:mm:ss");
+  const formatForApiEnd = (date: Date) => format(endOfDay(date), "yyyy-MM-dd'T'HH:mm:ss");
+
+    const payload = {
+      userId,
+      model: vehicleModel,
+  startTime: formatForApiStart(startDate),
+  endTime: formatForApiEnd(endDate),
+      token,
+    };
+
+    setIsBooking(true);
+    try {
+      const bookingResponse = await createBooking(payload);
+      const effectiveRentalAmount = rentalAmount;
+      const totalCharge = effectiveRentalAmount + depositAmount;
+
+      const storedEntry: StoredBooking = {
+        bookingId: bookingResponse.bookingId,
+        status: bookingResponse.status,
+  startTime: bookingResponse.startTime || formatForApiStart(startDate),
+  endTime: bookingResponse.endTime || formatForApiEnd(endDate),
+  bookingTime: bookingResponse.bookingTime || format(new Date(), "yyyy-MM-dd'T'HH:mm:ss"),
+        vehicle: {
+          id: bookingResponse.vehicleId,
+          model: bookingResponse.vehicleModel || vehicleModel,
+          name: vehicle.name,
+          type: vehicle.type,
+          image: vehicle.image || vehicle.imageUrl || "",
+          licensePlate: bookingResponse.vehicleLicensePlate,
+        },
+        price: effectiveRentalAmount,
+        deposit: depositAmount,
+        totalCharge,
+        pickupLocation,
         paymentMethod,
       };
-      
-      // Handle booking submission
-      console.log("Booking data:", bookingData);
-      alert(`Đặt xe thành công! Tổng tiền: ${selectedPricing.price.toLocaleString()}đ`);
+
+      appendBookingHistory(userId, storedEntry);
+
+      toast({
+        title: "Đặt xe thành công",
+        description: `Mã booking #${bookingResponse.bookingId}. Vui lòng tiến hành thanh toán để hoàn tất đặt xe.`,
+      });
+      navigate("/bookings");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Có lỗi xảy ra. Vui lòng thử lại.";
+      toast({
+        title: "Không thể đặt xe",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsBooking(false);
     }
   };
 
@@ -426,17 +381,33 @@ const VehicleDetailsPage = () => {
                   <MapPin className="w-4 h-4" />
                   <span>{vehicle.location}</span>
                 </div>
+                <div className="flex items-center gap-2 mt-2">
+                  <Badge className={isVehicleAvailable ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>
+                    {isVehicleAvailable ? "Sẵn sàng" : "Tạm dừng khai thác"}
+                  </Badge>
+                  {vehicle.status && (
+                    <Badge variant="outline" className="text-xs uppercase">
+                      {vehicle.status}
+                    </Badge>
+                  )}
+                </div>
               </div>
               
             </div>
 
             {/* Main Image */}
             <div>
-              <img
-                src={vehicle.image}
-                alt={vehicle.name}
-                className="w-full rounded-lg"
-              />
+              {mainImage ? (
+                <img
+                  src={mainImage}
+                  alt={vehicle.name}
+                  className="w-full rounded-lg object-cover"
+                />
+              ) : (
+                <div className="w-full h-64 rounded-lg bg-muted flex items-center justify-center text-muted-foreground">
+                  Chưa có ảnh
+                </div>
+              )}
             </div>
 
             {/* Features */}
@@ -503,72 +474,160 @@ const VehicleDetailsPage = () => {
           <div className="space-y-6">
             {/* Pricing */}
             <div>
-              <h3 className="text-lg font-semibold mb-4">Giá thuê</h3>
-              <div className="space-y-3">
-                {pricingOptions.map((option) => (
-                  <div
-                    key={option.duration}
-                    className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                      selectedDuration === option.duration
-                        ? 'border-green-500 bg-green-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                    onClick={() => setSelectedDuration(option.duration)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-semibold">
-                          {option.duration === "24" ? "1 ngày" : `${option.duration} giờ`}
-                        </p>
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg font-bold text-green-600">
-                            {option.price.toLocaleString()}đ
-                          </span>
-                          <span className="text-sm text-muted-foreground line-through">
-                            {option.originalPrice.toLocaleString()}đ
-                          </span>
-                          <Badge className="bg-red-100 text-red-800 text-xs">
-                            -{option.discount}%
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+              <h3 className="text-lg font-semibold mb-4">Giá & đặt cọc</h3>
+              <div className="space-y-3 rounded-lg border border-muted-foreground/20 bg-white p-4 shadow-sm">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Đơn giá thuê 1 ngày (24 giờ)</span>
+                  <span className="font-semibold text-green-700">{formatCurrency(pricePerDay)}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Số ngày tính phí</span>
+                  <span className="font-semibold text-green-700">
+                    {chargeableDays > 0 ? `${chargeableDays} ngày` : "Chưa xác định"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Đặt cọc bắt buộc</span>
+                  <span className="font-semibold text-blue-700">{formatCurrency(depositAmount)}</span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Phí thuê được tính theo thời gian thực tế: đơn giá ngày × số ngày (làm tròn lên đến 1 ngày nếu thời gian &ge; 8 giờ).
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Quy định đặt cọc: ô tô 5.000.000đ, xe máy 1.000.000đ. Mức hiển thị ở trên áp dụng cho loại xe này.
+                </p>
               </div>
-             
+            </div>
+
+            {/* Pickup option */}
+            <div className="border-2 border-green-100 rounded-lg p-4 bg-green-50">
+              <div className="flex items-center gap-2 mb-2">
+                <MapPin className="w-4 h-4 text-green-600" />
+                <span className="font-medium text-green-700">Hình thức nhận xe</span>
+              </div>
+              <Select value={pickupOption} onValueChange={setPickupOption}>
+                <SelectTrigger className="bg-white">
+                  <SelectValue placeholder="Chọn hình thức nhận xe" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="self">Nhận xe tại trạm</SelectItem>
+                  <SelectItem value="delivery">Giao xe tận nơi (+ phí)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="mt-2 text-xs text-muted-foreground">
+                {pickupOption === "self"
+                  ? "Bạn sẽ nhận xe trực tiếp tại điểm cho thuê."
+                  : "Nhân viên sẽ liên hệ để xác nhận địa chỉ và chi phí giao xe."}
+              </p>
+            </div>
+
+            {/* Payment method */}
+            <div className="border-2 border-blue-100 rounded-lg p-4 bg-blue-50">
+              <div className="flex items-center gap-2 mb-2">
+                <CreditCard className="w-4 h-4 text-blue-600" />
+                <span className="font-medium text-blue-700">Phương thức thanh toán</span>
+              </div>
+              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                <SelectTrigger className="bg-white">
+                  <SelectValue placeholder="Chọn phương thức thanh toán" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="credit-card">Thẻ tín dụng/Ghi nợ</SelectItem>
+                  <SelectItem value="momo">Ví MoMo</SelectItem>
+                  <SelectItem value="zalopay">Ví ZaloPay</SelectItem>
+                  <SelectItem value="cash">Thanh toán tiền mặt</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Rental Time */}
-            <div className="border-2 border-grenn-200 rounded-lg p-4 bg-red-50">
-              <div className="flex items-center gap-2 mb-2">
-                <CalendarIcon className="w-4 h-4 text-red-500" />
-                <span className="font-medium">Thời gian thuê</span>
+            <div className="rounded-lg border border-muted-foreground/20 bg-white p-4 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+                <div className="flex items-center gap-2">
+                      <CalendarIcon className="w-4 h-4 text-green-600" />
+                      <span className="font-medium text-green-700">Thời gian thuê</span>
+                    </div>
+                    {rentalDurationDays > 0 && (
+                      <Badge variant="outline" className="text-xs font-normal">
+                        Ước tính: {rentalDurationDays} ngày
+                      </Badge>
+                    )}
               </div>
-              <div className="grid grid-cols-2 gap-2 mb-3">
-                <div>
-                  <Label className="text-xs">Ngày bắt đầu</Label>
-                  <Input
-                    type="datetime-local"
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">Ngày bắt đầu</Label>
+                  <DateTimePicker
                     value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="text-sm"
+                    onChange={setStartDate}
+                    minDate={new Date()}
+                    placeholder="Chọn ngày bắt đầu"
+                    showTime={false}
                   />
                 </div>
-                <div>
-                  <Label className="text-xs">Ngày kết thúc</Label>
-                  <Input
-                    type="datetime-local"
+                <div className="space-y-1.5">
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">Ngày kết thúc</Label>
+                  <DateTimePicker
                     value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="text-sm"
+                    onChange={setEndDate}
+                    minDate={startDate ?? new Date()}
+                    placeholder="Chọn ngày kết thúc"
+                    showTime={false}
                   />
                 </div>
               </div>
-              <div className="flex items-center gap-2 text-red-600 text-sm">
-                <AlertCircle className="w-4 h-4" />
-                <span>Xe đang bận trong các khung thời gian này. Vui lòng chọn thời gian khác.</span>
+
+              <div className="mt-4 overflow-hidden rounded-md border border-muted-foreground/10">
+                <table className="w-full text-sm">
+                  <tbody>
+                    <tr className="border-b border-muted-foreground/10 bg-muted/30">
+                      <td className="px-3 py-2 font-medium text-muted-foreground">Ngày bắt đầu</td>
+                      <td className="px-3 py-2">
+                        {startDate ? format(startDate, "dd/MM/yyyy", { locale: vi }) : "Chưa chọn"}
+                      </td>
+                    </tr>
+                    <tr className="border-b border-muted-foreground/10">
+                      <td className="px-3 py-2 font-medium text-muted-foreground">Ngày kết thúc</td>
+                      <td className="px-3 py-2">
+                        {endDate ? format(endDate, "dd/MM/yyyy", { locale: vi }) : "Chưa chọn"}
+                      </td>
+                    </tr>
+                    <tr className="border-b border-muted-foreground/10">
+                      <td className="px-3 py-2 font-medium text-muted-foreground">Số ngày thuê</td>
+                      <td className="px-3 py-2">
+                        {rentalDurationDays > 0 ? `${rentalDurationDays} ngày` : "Chưa xác định"}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="px-3 py-2 font-medium text-muted-foreground">Yêu cầu tối thiểu</td>
+                      <td className="px-3 py-2">≥ {minDurationDays} ngày</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
+
+              <p className="mt-3 text-xs text-muted-foreground">
+                Bạn có thể đặt trước tối đa {maxAdvanceDays} ngày kể từ thời điểm hiện tại.
+              </p>
+              {advanceLimitExceeded && (
+                <p className="text-xs text-red-600 mt-1">
+                  Ngày bắt đầu vượt quá giới hạn đặt trước. Vui lòng chọn ngày sớm hơn.
+                </p>
+              )}
+
+              {(startDate && endDate) && (!isEndAfterStart || !isDurationValid) && (
+                <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="mt-0.5 h-4 w-4" />
+                    <div className="space-y-1">
+                      {!isEndAfterStart && <p>Ngày kết thúc phải sau ngày bắt đầu.</p>}
+                      {!isDurationValid && (
+                        <p>Thời gian thuê tối thiểu là {minDurationDays} ngày. Vui lòng chọn khoảng thời gian dài hơn.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Bảo hiểm thuê xe */}
@@ -638,60 +697,55 @@ const VehicleDetailsPage = () => {
               </Dialog>
             )}
 
-            {/* Bảng phụ phí */}
-            <div className="my-6">
-              <h4 className="font-semibold mb-2 text-black">Phụ phí có thể phát sinh</h4>
-              <table className="w-full text-sm border border-gray-200 rounded-lg overflow-hidden">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="py-2 px-3 text-left">Loại phí</th>
-                    <th className="py-2 px-3 text-left">Mức phí</th>
-                    <th className="py-2 px-3 text-left">Ghi chú</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="border-t">
-                    <td className="py-2 px-3">Phí vượt giới hạn</td>
-                    <td className="py-2 px-3">4.000₫/km</td>
-                    <td className="py-2 px-3">Vượt quá 400km khi thuê xe 1 ngày</td>
-                  </tr>
-                  <tr className="border-t">
-                    <td className="py-2 px-3">Phí sạc Pin</td>
-                    <td className="py-2 px-3">2.400₫/1% mã pin</td>
-                    <td className="py-2 px-3">Thanh toán theo thực tế sử dụng</td>
-                  </tr>
-                  <tr className="border-t">
-                    <td className="py-2 px-3">Phí quá giờ</td>
-                    <td className="py-2 px-3">100.000₫/giờ</td>
-                    <td className="py-2 px-3">Trễ quá 5 giờ, phụ phí thêm 1 ngày thuê</td>
-                  </tr>
-                  <tr className="border-t">
-                    <td className="py-2 px-3">Phụ phí khác</td>
-                    <td className="py-2 px-3">Theo thực tế</td>
-                    <td className="py-2 px-3">Trả xe không đảm bảo vệ sinh hoặc bị ám mùi</td>
-                  </tr>
-                </tbody>
-              </table>
-              
-            </div>
-
             {/* Total and Book Button */}
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <div className="flex justify-between items-center mb-4">
-                <span className="text-green-700">
-                  {selectedPricing.duration === "24" ? "1 ngày" : `${selectedPricing.duration} giờ`} × {selectedPricing.price.toLocaleString()}₫
-                </span>
-                <span className="text-xl font-bold text-green-800">
-                  {selectedPricing.price.toLocaleString()}₫
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 space-y-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Tiền thuê dự kiến</span>
+                <span className="font-semibold text-green-800">
+                  {rentalAmount > 0 ? formatCurrency(rentalAmount) : "Chọn thời gian"}
                 </span>
               </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Đặt cọc</span>
+                <span className="font-semibold text-blue-700">
+                  {formatCurrency(depositAmount)}
+                </span>
+              </div>
+              <div className="flex justify-between items-center pt-2 border-t border-green-200 text-base font-semibold">
+                <span>Tổng thanh toán ban đầu</span>
+                <span className="text-green-900">{formatCurrency(totalPayable)}</span>
+              </div>
+
+              {advanceLimitExceeded && (
+                <p className="text-xs text-red-600">
+                  Ngày bắt đầu thuê không được vượt quá {maxAdvanceDays} ngày so với hiện tại.
+                </p>
+              )}
+
+              {!isVehicleAvailable && (
+                <p className="text-xs text-red-600">
+                  Xe hiện không khả dụng để đặt. Vui lòng chọn xe khác hoặc quay lại sau.
+                </p>
+              )}
+
               <Button
                 className="w-full bg-green-500 hover:bg-green-600"
                 onClick={handleBooking}
-                disabled={!startDate || !endDate || !paymentMethod}
+                disabled={
+                  !startDate ||
+                  !endDate ||
+                  isBooking ||
+                  !isEndAfterStart ||
+                  !isDurationValid ||
+                  advanceLimitExceeded ||
+                  !isVehicleAvailable
+                }
               >
-                Đặt xe ngay
+                {isBooking ? "Đang xử lý..." : "Thanh toán"}
               </Button>
+              <p className="text-xs text-muted-foreground">
+                Vui lòng hoàn tất thanh toán theo hướng dẫn để xác nhận đặt xe.
+              </p>
             </div>
           </div>
         </div>

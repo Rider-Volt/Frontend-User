@@ -19,15 +19,13 @@ interface NavbarProps {
 const Navbar: React.FC<NavbarProps> = ({ isLoggedIn, username }) => {
   const navigate = useNavigate();
 
-  const handleLogout = async () => {
-    try {
-      await logoutApi(); // gọi API logout
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-      navigate("/login");
-    } catch (err) {
-      console.error("Logout failed:", err);
-    }
+  const handleLogout = () => {
+    // Optimistic logout: dọn local state và điều hướng ngay lập tức
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    navigate("/login");
+    // Gọi API ở hậu cảnh, không chặn UI
+    logoutApi().catch((err) => console.error("Logout failed:", err));
   };
 
   return (

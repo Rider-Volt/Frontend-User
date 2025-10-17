@@ -1,37 +1,43 @@
 // src/services/carService.ts
-export interface Car {
-  id: number;
-  name: string;
-  type: string;
-  batteryLevel: number;
-  range: number;
-  pricePerDay: number;
-  location: string;
-  image: string;
-  available: boolean;
+import type { VehicleData } from "@/data/vehicles";
+
+// Normalize any incoming vehicle type labels to E-* categories used in UI
+function normalizeType(input?: string): "E-Scooter" | "E-Bike" | "E-Car" | "Khác" {
+  const s = (input || "").trim().toLowerCase();
+  if (!s) return "Khác";
+  // Vietnamese to E-* mapping
+  if (/(xe\s*máy\s*điện|xe may dien|scooter)/i.test(s)) return "E-Scooter";
+  if (/(xe\s*đạp\s*điện|xe dap dien|e-bike|ebike|bike)/i.test(s)) return "E-Bike";
+  if (/(ô\s*tô\s*điện|o to dien|oto dien|car|vf|vinfast|ô tô điện)/i.test(s)) return "E-Car";
+  // Generic fallbacks
+  if (/scooter/i.test(s)) return "E-Scooter";
+  if (/bike/i.test(s)) return "E-Bike";
+  if (/car|sedan|suv|hatchback/i.test(s)) return "E-Car";
+  return "Khác";
 }
 
 export function searchCars(
-  cars: Car[],
+  cars: VehicleData[],
   location: string,
   vehicleType: string
-): Car[] {
+): VehicleData[] {
   return cars.filter((car) => {
     const matchLocation = location
-      ? car.location.toLowerCase().includes(location.toLowerCase())
+      ? (car.location || "").toLowerCase().includes(location.toLowerCase())
       : true;
     const matchType = vehicleType
-      ? car.type.toLowerCase() === vehicleType.toLowerCase()
+      ? normalizeType(car.type) === normalizeType(vehicleType)
       : true;
     return matchLocation && matchType;
   });
 }
 
-export function groupCarsByType(cars: Car[]): Record<string, Car[]> {
+export function groupCarsByType(cars: VehicleData[]): Record<string, VehicleData[]> {
   return cars.reduce((groups, car) => {
-    const type = car.type || "Khác";
-    if (!groups[type]) groups[type] = [];
-    groups[type].push(car);
+    const normalized = normalizeType(car.type);
+    const key = normalized === "Khác" ? (car.type || "Khác") : normalized;
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(car);
     return groups;
-  }, {} as Record<string, Car[]>);
+  }, {} as Record<string, VehicleData[]>);
 }

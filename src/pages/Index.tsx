@@ -1,15 +1,20 @@
 import React, { useState, useEffect } from "react";
-import { Car, Shield, Ticket, HeartHandshake } from "lucide-react";
+import { Shield, Ticket, HeartHandshake } from "lucide-react";
 import Navbar from "../components/heroUi/Navbar";
 import SearchBar, { VehicleType } from "../components/heroUi/Searchbar";
 import EVCard from "../components/heroUi/EVCard";
 import { useNavigate } from "react-router-dom";
-import { groupCarsByType, Car as CarType } from "@/services/carServices";
+import { groupCarsByType } from "@/services/carServices";
+import { VehicleData } from "@/data/vehicles";
+import { fetchVehiclesLimited } from "@/services/vehicleService";
 
 const Index: React.FC = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [username, setUsername] = useState("");
   const navigate = useNavigate();
+  const [vehicles, setVehicles] = useState<VehicleData[]>([]);
+  const [loadingVehicles, setLoadingVehicles] = useState(true);
+  const [vehiclesError, setVehiclesError] = useState<string | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -44,106 +49,33 @@ const Index: React.FC = () => {
     navigate(`/search?${searchParams.toString()}`);
   };
 
-  const handleBookingSubmit = (bookingData: any) => {
-    console.log("Booking submitted:", bookingData);
-    alert(
-      `Đặt xe thành công! Tổng tiền: ${bookingData.totalPrice.toLocaleString()}đ`
-    );
-  };
+  useEffect(() => {
+    let cancelled = false;
+    const loadVehicles = async () => {
+      setLoadingVehicles(true);
+      setVehiclesError(null);
+      try {
+        const data = await fetchVehiclesLimited(24);
+        if (!cancelled) {
+          setVehicles(data);
+        }
+      } catch (err: any) {
+        if (!cancelled) {
+          setVehiclesError(err?.message || "Không tải được danh sách xe");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingVehicles(false);
+        }
+      }
+    };
+    loadVehicles();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-  // 🚗 demo
-  const popularCars: CarType[] = [
-    {
-      id: 1,
-      name: "VinFast VF e34",
-      type: "Ô tô điện",
-      batteryLevel: 85,
-      range: 300,
-      pricePerDay: 600000,
-      location: "Quận 1, TP.HCM",
-      image: "/images/imagecar/e34.jpg",
-      available: true,
-    },
-    {
-      id: 2,
-      name: "VINFAST VF 3",
-      type: "Ô tô điện",
-      batteryLevel: 92,
-      range: 450,
-      pricePerDay: 1200000,
-      location: "Quận 2, TP.HCM",
-      image: "/images/imagecar/vf3.jpg",
-      available: true,
-    },
-    {
-      id: 3,
-      name: "VINFAST VF 5",
-      type: "Ô tô điện",
-      batteryLevel: 78,
-      range: 380,
-      pricePerDay: 960000,
-      location: "Quận 7, TP.HCM",
-      image: "/images/imagecar/vf5.jpg",
-      available: false,
-    },
-    {
-      id: 4,
-      name: "VINFAST VF 6",
-      type: "Ô tô điện",
-      batteryLevel: 88,
-      range: 420,
-      pricePerDay: 1080000,
-      location: "Quận 3, TP.HCM",
-      image: "/images/imagecar/vf6.jpg",
-      available: true,
-    },
-    {
-      id: 11,
-      name: "xe máy điện VinFast feliz",
-      type: "Xe máy điện",
-      batteryLevel: 85,
-      range: 300,
-      pricePerDay: 600000,
-      location: "Quận 1, TP.HCM",
-      image: "/images/imagecar/feliz.jpg",
-      available: true,
-    },
-    {
-      id: 12,
-      name: "xe máy điện VinFast klara Neo ",
-      type: "Xe máy điện",
-      batteryLevel: 85,
-      range: 300,
-      pricePerDay: 600000,
-      location: "Quận 1, TP.HCM",
-      image: "/images/imagecar/klaraneo.jpg",
-      available: true,
-    },
-    {
-      id: 13,
-      name: "xe máy điện VinFast evoneo",
-      type: "Xe máy điện",
-      batteryLevel: 85,
-      range: 300,
-      pricePerDay: 600000,
-      location: "Quận 1, TP.HCM",
-      image: "/images/imagecar/evoneo.jpg",
-      available: true,
-    },
-    {
-      id: 14,
-      name: "xe máy điện VinFast evogrand",
-      type: "Xe máy điện",
-      batteryLevel: 85,
-      range: 300,
-      pricePerDay: 600000,
-      location: "Quận 1, TP.HCM",
-      image: "/images/imagecar/evogrand.jpg",
-      available: true,
-    },
-  ];
-
-  const carGroups = groupCarsByType(popularCars);
+  const carGroups = groupCarsByType(vehicles.filter((car) => car.available !== false));
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-secondary/20 to-accent/20">
@@ -179,27 +111,37 @@ const Index: React.FC = () => {
         {/* Popular Cars */}
         <section className="py-16 px-4 bg-secondary/10">
           <div className="container mx-auto max-w-7xl space-y-16">
-            {Object.entries(carGroups).map(([groupName, cars]) => (
-              <div key={groupName}>
-                <div className="flex justify-between items-center mb-8">
-                  <h2 className="text-3xl font-bold">{groupName}</h2>
-                  <button
-                    onClick={() => navigate(`/search?type=${groupName}`)}
-                    className="text-primary hover:underline"
-                  >
-                    Xem tất cả
-                  </button>
+            {loadingVehicles ? (
+              <p>Đang tải xe nổi bật…</p>
+            ) : vehiclesError ? (
+              <p className="text-center text-red-500">{vehiclesError}</p>
+            ) : Object.keys(carGroups).length > 0 ? (
+              Object.entries(carGroups).map(([groupName, cars]) => (
+                <div key={groupName}>
+                  <div className="flex justify-between items-center mb-8">
+                    <h2 className="text-3xl font-bold">{groupName}</h2>
+                    <button
+                      onClick={() => navigate(`/search?type=${groupName}`)}
+                      className="text-primary hover:underline"
+                    >
+                      Xem tất cả
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {cars.slice(0, 4).map((car) => (
+                      <EVCard
+                        key={car.id}
+                        {...car}
+                      />
+                    ))}
+                  </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                  {cars.map((car) => (
-                    <EVCard
-                      key={car.id}
-                      {...car}
-                    />
-                  ))}
-                </div>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p className="text-center text-muted-foreground">
+                Chưa có xe để hiển thị.
+              </p>
+            )}
           </div>
         </section>
 

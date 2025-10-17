@@ -19,6 +19,9 @@ import AdminVehiclesPage from './pages/AdminVehiclesPage';
 import AdminCustomersPage from './pages/AdminCustomersPage';
 import AdminStationsPage from './pages/AdminStationsPage';
 import AdminEmployeesPage from './pages/AdminEmployeesPage';
+import StationStaffLayout from '@/components/layout/StationStaffLayout';
+import StationStaffVehiclesPage from './pages/StationStaffVehiclesPage'; 
+import StationStaffOrders from '@/components/StationStaff/StationStaffOrders';
 
 const queryClient = new QueryClient();
 
@@ -37,17 +40,26 @@ const App = () => (
           <Route path="/profile" element={<Profile />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-           <Route path="/admin" element={<AdminLayout />}>
-           <Route path="dashboard" element={<AdminDashboardPage />} />
+
+          {/* ADMIN ROUTES */}
+          <Route path="/admin" element={<AdminLayout />}>
+            <Route path="dashboard" element={<AdminDashboardPage />} />
             <Route path="revenue" element={<AdminRevenuePage />} />
             <Route path="vehicles" element={<AdminVehiclesPage />} />
             <Route path="customers" element={<AdminCustomersPage />} />
             <Route path="stations" element={<AdminStationsPage />} />
             <Route path="employees" element={<AdminEmployeesPage />} />
-
+            <Route path="*" element={<NotFound />} />
           </Route>
+
+          {/* STATION STAFF ROUTES  */}
+          <Route path="/StationStaff" element={<StationStaffLayout />}>
+            <Route path="vehicles" element={<StationStaffVehiclesPage />} />
+            <Route path="orders" element={<StationStaffOrders />} />
+          </Route>
+
+          {/* CATCH ALL */}
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
     </TooltipProvider>

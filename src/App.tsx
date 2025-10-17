@@ -21,6 +21,7 @@ import AdminStationsPage from './pages/AdminStationsPage';
 import AdminEmployeesPage from './pages/AdminEmployeesPage';
 import StationStaffLayout from '@/components/layout/StationStaffLayout';
 import StationStaffVehiclesPage from './pages/StationStaffVehiclesPage'; 
+import StationStaffOrders from '@/components/StationStaff/StationStaffOrders';
 
 const queryClient = new QueryClient();
 
@@ -52,9 +53,9 @@ const App = () => (
           </Route>
 
           {/* STATION STAFF ROUTES  */}
-          <Route path="/stationstaff" element={<StationStaffLayout />}>
+          <Route path="/StationStaff" element={<StationStaffLayout />}>
             <Route path="vehicles" element={<StationStaffVehiclesPage />} />
-            {/* Thêm các route khác cho station staff ở đây nếu cần */}
+            <Route path="orders" element={<StationStaffOrders />} />
           </Route>
 
           {/* CATCH ALL */}

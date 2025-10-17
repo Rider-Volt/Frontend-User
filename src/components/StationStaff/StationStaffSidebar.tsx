@@ -32,7 +32,7 @@ const StationStaffSidebar = ({ isOpen, onToggle }: StationStaffSidebarProps) => 
     },
     {
       name: 'Quản lý đơn thuê',
-      href: '/',
+      href: '/StationStaff/orders',
       icon: Calendar
     },
     {

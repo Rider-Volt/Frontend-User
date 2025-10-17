@@ -114,10 +114,11 @@ const availableImages = [
   { name: 'Vento Neo', path: '/images/imagecar/ventoneo.jpg' },
 ];
 
-const stationstaffVehicles = () => {
+const StationStaffVehicles = () => {
   const [vehicles, setVehicles] = useState<Vehicle[]>(initialVehicles);
   const [trackingData, setTrackingData] = useState<VehicleTracking[]>(mockTrackingData);
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'available' | 'prebooked' | 'rented'>('all');
   const [trackingSearch, setTrackingSearch] = useState('');
   const [selectedVehicle, setSelectedVehicle] = useState<string>('');
   const [editing, setEditing] = useState<Vehicle | null>(null);
@@ -125,11 +126,21 @@ const stationstaffVehicles = () => {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return vehicles;
-    return vehicles.filter(v =>
+    let list = vehicles;
+    // Map status filter to our demo statuses
+    if (statusFilter !== 'all') {
+      list = list.filter(v => {
+        if (statusFilter === 'available') return v.status === 'available';
+        if (statusFilter === 'prebooked') return v.status === 'maintenance'; // demo mapping
+        if (statusFilter === 'rented') return v.status === 'disabled'; // demo mapping
+        return true;
+      });
+    }
+    if (!q) return list;
+    return list.filter(v =>
       [v.id, v.model, v.segment, v.plate, v.station].some(f => f.toLowerCase().includes(q))
     );
-  }, [vehicles, search]);
+  }, [vehicles, search, statusFilter]);
 
   const filteredTracking = useMemo(() => {
     let filtered = trackingData;
@@ -231,17 +242,29 @@ const stationstaffVehicles = () => {
               onChange={(e) => setSearch(e.target.value)}
               className="w-full sm:max-w-md"
             />
-            <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-              <DialogTrigger asChild>
-                <Button onClick={() => setEditing(null)} className="bg-green-500 hover:bg-green-600">
-                  <Plus className="h-4 w-4 mr-2" /> Thêm xe
-                </Button>
-              </DialogTrigger>
-              <VehicleFormModal
-                editing={editing}
-                onSave={handleSave}
-              />
-            </Dialog>
+            <div className="flex items-center gap-2">
+              <select
+                className="border rounded-md px-3 py-2 text-sm"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as any)}
+              >
+                <option value="all">Tất cả trạng thái</option>
+                <option value="available">Có sẵn</option>
+                <option value="prebooked">Đã đặt trước</option>
+                <option value="rented">Đang cho thuê</option>
+              </select>
+              <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+                <DialogTrigger asChild>
+                  <Button onClick={() => setEditing(null)} className="bg-green-500 hover:bg-green-600">
+                    <Plus className="h-4 w-4 mr-2" /> Thêm xe
+                  </Button>
+                </DialogTrigger>
+                <VehicleFormModal
+                  editing={editing}
+                  onSave={handleSave}
+                />
+              </Dialog>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -451,7 +474,7 @@ const stationstaffVehicles = () => {
   );
 };
 
-export default stationstaffVehicles;
+export default StationStaffVehicles;
 
 interface VehicleFormModalProps {
   editing: Vehicle | null;

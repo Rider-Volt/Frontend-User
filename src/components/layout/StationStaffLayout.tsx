@@ -15,8 +15,8 @@ const StationStaffLayout = () => {
     const token = localStorage.getItem('token');
     if (!token) {
     //   navigate('/StationStaff/login', { replace: true });
-    } else if (location.pathname === '/stationstaff') {
-      navigate('/staionstaff/vehicles', { replace: true });
+    } else if (location.pathname.toLowerCase() === '/stationstaff') {
+      navigate('/StationStaff/vehicles', { replace: true });
     }
   }, [navigate, location.pathname]);
 

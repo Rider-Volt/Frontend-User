@@ -1,14 +1,21 @@
 // src/services/authService.ts
 
-export const API_BASE = "https://backend.ridervolt.app/api";
+// In development, always route through the Vite proxy at /api to avoid CORS
+export const API_BASE = import.meta.env.DEV ? "/api" : "https://backend.ridervolt.app/api";
 
 // Cho phép chỉnh endpoint nếu BE khác tên
 export const PROFILE_ENDPOINTS = {
   me: `${API_BASE}/user/me`,          // GET thông tin hồ sơ theo token
   update: `${API_BASE}/user/me`,      // PATCH cập nhật hồ sơ
-  login: `${API_BASE}/login`,
+  // BE quy định renter login tại /renter/login
+  login: `${API_BASE}/renter/login`,
   logout: `${API_BASE}/logout`,
   register: `${API_BASE}/register`,
+};
+
+// Staff endpoints
+export const STAFF_ENDPOINTS = {
+  login: `${API_BASE}/staff/login`,
 };
 
 export interface LoginResponse {
@@ -110,7 +117,7 @@ export async function register(payload: RegisterPayload): Promise<RegisterRespon
 export async function login(email: string, password: string, recaptchaToken?: string): Promise<LoginResponse> {
   const resp = await fetch(PROFILE_ENDPOINTS.login, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "Accept": "application/json" },
     body: JSON.stringify({ email, password, recaptchaToken }),
   });
 
@@ -118,14 +125,17 @@ export async function login(email: string, password: string, recaptchaToken?: st
   try { data = await resp.json(); } catch { data = {}; }
 
   if (!resp.ok) {
-    throw new Error(data.message || "Sai email hoặc mật khẩu");
+    const status = resp.status;
+    const base = data?.message || resp.statusText || "Sai email hoặc mật khẩu";
+    throw new Error(`HTTP ${status}: ${base}`);
   }
 
   const userData: LoginResponse = {
     accessToken: data.accessToken,
     refreshToken: data.refreshToken,
-    username: data.userName || email,
-    full_name: data.userName,
+    // RenterAuthResponse trả về renterName
+    username: data.renterName || email,
+    full_name: data.renterName,
     email: data.email || email,
     status: data.status || "ACTIVE",
     is_active: data.is_active ?? true,
@@ -341,4 +351,62 @@ function toBackendProfilePayload(userPatch: UpdateUserPayload): Record<string, u
   }
 
   return payload;
+}
+
+// Staff login (không cần reCAPTCHA)
+export interface StaffLoginResponse {
+  accessToken: string;
+  staffName: string;
+  staffId: number;
+  stationId: number | null;
+}
+
+export async function staffLogin(email: string, password: string): Promise<StaffLoginResponse> {
+  const tryLogin = async (payload: Record<string, unknown>) => {
+    const resp = await fetch(STAFF_ENDPOINTS.login, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Accept": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    let data: any = {};
+    try { data = await resp.json(); } catch { data = {}; }
+    return { resp, data } as const;
+  };
+
+  // First: email/password (matches backend DTO)
+  let { resp, data } = await tryLogin({ email, password });
+  // If rejected, retry with username/password to cover alternate BE expectations
+  if (!resp.ok && (resp.status === 400 || resp.status === 401 || resp.status === 403)) {
+    const second = await tryLogin({ username: email, password });
+    if (second.resp.ok || second.resp.status === 403) {
+      resp = second.resp; data = second.data;
+    }
+  }
+
+  if (!resp.ok) {
+    const status = resp.status;
+    const base = data?.message || resp.statusText || "Đăng nhập nhân viên thất bại";
+    const hint = status === 403 ? " (Không tìm thấy tài khoản STAFF cho email này hoặc mật khẩu không đúng)" : "";
+    throw new Error(`HTTP ${status}: ${base}${hint}`);
+  }
+
+  const result: StaffLoginResponse = {
+    accessToken: data.accessToken,
+    staffName: data.staffName,
+    staffId: data.staffId,
+    stationId: typeof data.stationId === "number" ? data.stationId : null,
+  };
+
+  // Lưu riêng để không xung đột renter
+  localStorage.setItem("staff_token", result.accessToken);
+  localStorage.setItem("staff_user", JSON.stringify(result));
+  return result;
+}
+
+// Staff logout: clear only staff-related storage
+export function staffLogout(): void {
+  try {
+    localStorage.removeItem("staff_token");
+    localStorage.removeItem("staff_user");
+  } catch {}
 }

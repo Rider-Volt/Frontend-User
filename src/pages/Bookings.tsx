@@ -150,12 +150,12 @@ const Bookings = () => {
             <div className="flex items-center gap-4">
               <img
                 src={booking.vehicle.image || fallbackImage}
-                alt={booking.vehicle.name || booking.vehicle.model}
+                alt={booking.vehicle.model || booking.vehicle.name}
                 className="w-16 h-16 object-cover rounded-lg border border-muted"
               />
               <div>
                 <CardTitle className="text-lg">
-                  {booking.vehicle.name || booking.vehicle.model}
+                  {booking.vehicle.model || booking.vehicle.name}
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
                   {booking.vehicle.type || booking.vehicle.model}

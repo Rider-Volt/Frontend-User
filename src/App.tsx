@@ -22,6 +22,7 @@ import AdminEmployeesPage from './pages/AdminEmployeesPage';
 import StationStaffLayout from '@/components/layout/StationStaffLayout';
 import StationStaffVehiclesPage from './pages/StationStaffVehiclesPage'; 
 import StationStaffOrders from '@/components/StationStaff/StationStaffOrders';
+import StaffLogin from './pages/StaffLogin';
 
 const queryClient = new QueryClient();
 
@@ -53,6 +54,7 @@ const App = () => (
           </Route>
 
           {/* STATION STAFF ROUTES  */}
+          <Route path="/StationStaff/login" element={<StaffLogin />} />
           <Route path="/StationStaff" element={<StationStaffLayout />}>
             <Route path="vehicles" element={<StationStaffVehiclesPage />} />
             <Route path="orders" element={<StationStaffOrders />} />

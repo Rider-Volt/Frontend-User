@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, DollarSign, Route, Bus, Users, Menu, X, Map, Calendar, Clock, UserCog, Car } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -8,6 +8,9 @@ interface AdminSidebarProps {
 }
 
 const AdminSidebar = ({ isOpen, onToggle }: AdminSidebarProps) => {
+  const location = useLocation();
+  // We intentionally avoid persistent active highlight; only show hover styles per user request.
+  const isPathActive = (_href: string) => false;
   const navigationItems = [
     {
       name: 'Bảng điều khiển',
@@ -32,7 +35,7 @@ const AdminSidebar = ({ isOpen, onToggle }: AdminSidebarProps) => {
     },
     {
       name: 'Quản lý đơn thuê',
-      href: '/admin/',
+      href: '/admin/orders',
       icon: Calendar
     },
     {
@@ -71,32 +74,28 @@ const AdminSidebar = ({ isOpen, onToggle }: AdminSidebarProps) => {
 
       {/* Navigation Menu */}
       <nav className="mt-6 px-3">
-        {navigationItems.map((item) => (
-          <NavLink
-            key={item.name}
-            to={item.href}
-            end={item.end}
-            className={({ isActive }) =>
-              `flex items-center px-3 py-3 mb-2 rounded-lg text-sm font-medium transition-all duration-200 group ${
-                isActive
-                  ? 'bg-green-500 text-white shadow-md'
-                  : 'text-gray-700 hover:bg-green-50 hover:text-green-700'
-              }`
-            }
-          >
-            <item.icon className={`h-5 w-5 ${isOpen ? 'mr-3' : 'mx-auto'} flex-shrink-0`} />
-            {isOpen && (
-              <span className="truncate">{item.name}</span>
-            )}
-            
-            {/* Tooltip for collapsed state */}
-            {!isOpen && (
-              <div className="absolute left-16 px-2 py-1 bg-gray-800 text-white text-xs rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50">
-                {item.name}
-              </div>
-            )}
-          </NavLink>
-        ))}
+        {navigationItems.map((item) => {
+          const active = isPathActive(item.href);
+          return (
+            <div key={item.name} className="relative group">
+              <Link
+                to={item.href}
+                className={`flex items-center px-3 py-3 mb-2 rounded-lg text-sm font-medium transition-all duration-200 text-gray-700 hover:bg-green-50 hover:text-green-700`}
+                aria-current={active ? 'page' : undefined}
+              >
+                <item.icon className={`h-5 w-5 ${isOpen ? 'mr-3' : 'mx-auto'} flex-shrink-0`} />
+                {isOpen && (
+                  <span className="truncate">{item.name}</span>
+                )}
+              </Link>
+              {!isOpen && (
+                <div className="absolute left-16 top-1/2 -translate-y-1/2 px-2 py-1 bg-gray-800 text-white text-xs rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50 pointer-events-none">
+                  {item.name}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </nav>
 
       {/* Sidebar Background Accent */}

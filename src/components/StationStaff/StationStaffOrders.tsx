@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -6,8 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Car, User, Phone, Calendar, Clock, MapPin } from 'lucide-react';
+import { fetchVehicleById } from '@/services/vehicleService';
 
+// Map FE order buckets to backend billing statuses
 type OrderStatus = 'pending' | 'confirmed' | 'ongoing' | 'completed' | 'cancelled';
+import { getStationBillings, updateBillingStatus, BillingStatus, BillingResponse } from '@/services/staffBillingService';
 
 interface StaffOrder {
   id: string;
@@ -23,56 +26,7 @@ interface StaffOrder {
   notes?: string;
 }
 
-const initialOrders: StaffOrder[] = [
-  {
-    id: 'ORD-001',
-    vehicleId: 'VF8-001',
-    vehicleName: 'VinFast VF8',
-    plate: '30G-123.45',
-    customerName: 'Nguyễn Văn A',
-    customerPhone: '0901234567',
-    pickupTime: new Date('2025-01-15T09:00:00'),
-    returnTime: new Date('2025-01-16T09:00:00'),
-    pickupLocation: 'EV Station A',
-    status: 'pending',
-  },
-  {
-    id: 'ORD-002',
-    vehicleId: 'VF7-011',
-    vehicleName: 'VinFast VF7',
-    plate: '51H-678.90',
-    customerName: 'Trần Thị B',
-    customerPhone: '0912345678',
-    pickupTime: new Date('2025-01-16T10:00:00'),
-    returnTime: new Date('2025-01-17T10:00:00'),
-    pickupLocation: 'EV Station B',
-    status: 'confirmed',
-  },
-  {
-    id: 'ORD-003',
-    vehicleId: 'VF6-005',
-    vehicleName: 'VinFast VF6',
-    plate: '47A-333.22',
-    customerName: 'Phạm Quốc C',
-    customerPhone: '0988888888',
-    pickupTime: new Date('2025-01-14T08:30:00'),
-    returnTime: new Date('2025-01-15T08:30:00'),
-    pickupLocation: 'EV Station C',
-    status: 'ongoing',
-  },
-  {
-    id: 'ORD-004',
-    vehicleId: 'KLA-101',
-    vehicleName: 'VinFast Klara',
-    plate: '29E1-456.78',
-    customerName: 'Đỗ Ngọc D',
-    customerPhone: '0977777777',
-    pickupTime: new Date('2025-01-12T13:00:00'),
-    returnTime: new Date('2025-01-12T17:00:00'),
-    pickupLocation: 'EV Station A',
-    status: 'completed',
-  },
-];
+const initialOrders: StaffOrder[] = [];
 
 const statusBadge = (s: OrderStatus) => {
   switch (s) {
@@ -92,10 +46,90 @@ const statusBadge = (s: OrderStatus) => {
 const formatDateTime = (d: Date) =>
   d.toLocaleString('vi-VN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
 
+// Cache model id -> model name to avoid repeated calls
+const modelNameCache = new Map<number, string>();
+
+async function getModelNameById(modelId: number): Promise<string | undefined> {
+  if (modelNameCache.has(modelId)) return modelNameCache.get(modelId);
+  const data = await fetchVehicleById(modelId).catch(() => null);
+  const name = data?.model || data?.name;
+  if (name) modelNameCache.set(modelId, name);
+  return name;
+}
+
 const StationStaffOrders = () => {
   const [orders, setOrders] = useState<StaffOrder[]>(initialOrders);
   const [search, setSearch] = useState('');
   const [tab, setTab] = useState<OrderStatus | 'all'>('all');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Map backend Billing -> FE StaffOrder
+  const mapBilling = (b: BillingResponse): StaffOrder => {
+    // Prefer direct vehicleModel from API if provided, else resolve from nested model or cache by id
+    const directModelName = (b as any).vehicleModel as string | undefined;
+    const modelId = (b as any).vehicleId ? Number((b as any).vehicleId) : (
+      typeof b.vehicle?.model?.id === 'number' ? b.vehicle.model!.id : undefined
+    );
+    const cachedName = modelId ? modelNameCache.get(modelId) : undefined;
+    const vehicleName = directModelName || b.vehicle?.model?.name || cachedName || (modelId ? `Model #${modelId}` : 'Mẫu xe');
+    const pickup = new Date(b.startTime);
+    const ret = new Date(b.endTime);
+    const stationName = b.vehicle?.station?.name || '';
+    // Widen backend status mapping
+    const status: OrderStatus = (() => {
+      switch (b.status) {
+        case 'PENDING': return 'pending';
+        case 'APPROVED': return 'confirmed';
+        case 'RENTING': return 'ongoing';
+        case 'PAYED':
+        case 'COMPLETED': return 'completed';
+        case 'CANCELLED': default: return 'cancelled';
+      }
+    })();
+    return {
+      id: String(b.id),
+      vehicleId: String(b.vehicle?.id ?? ''),
+      vehicleName,
+      plate: b.vehicle?.code || '',
+      customerName: (b as any).renterName || b.renter?.name || '',
+      customerPhone: (b as any).renterPhone || b.renter?.phone || '',
+      pickupTime: pickup,
+      returnTime: ret,
+      pickupLocation: stationName,
+      status,
+    };
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await getStationBillings();
+        // Pre-resolve missing model names by id
+        const missing = new Set<number>();
+        for (const b of data as any[]) {
+          const directName = b.vehicleModel as string | undefined;
+          if (directName) continue;
+          const mId = typeof b?.vehicle?.model?.id === 'number' ? b.vehicle.model.id : (typeof b.vehicleId === 'number' ? b.vehicleId : undefined);
+          const mName = b?.vehicle?.model?.name as string | undefined;
+          if (mId && !mName && !modelNameCache.has(mId)) missing.add(mId);
+        }
+        if (missing.size) {
+          await Promise.all(Array.from(missing).map(id => getModelNameById(id)));
+        }
+        if (!cancelled) setOrders(data.map(mapBilling));
+      } catch (e: any) {
+        if (!cancelled) setError(e?.message || 'Không tải được danh sách đơn');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, []);
 
   const filtered = useMemo(() => {
     let list = orders;
@@ -106,20 +140,45 @@ const StationStaffOrders = () => {
       .some(f => f.toLowerCase().includes(q)));
   }, [orders, search, tab]);
 
-  const updateStatus = (id: string, status: OrderStatus) => {
-    setOrders(prev => prev.map(o => (o.id === id ? { ...o, status } : o)));
+  const updateStatus = async (id: string, next: OrderStatus) => {
+    // Only map actions that backend supports (PAYED / CANCELLED). Other FE-only states are not backed.
+    const toBackend = (s: OrderStatus): BillingStatus | null => {
+      if (s === 'completed') return 'PAYED';
+      if (s === 'cancelled') return 'CANCELLED';
+      return null; // no-op for confirmed/ongoing because backend doesn't have those statuses
+    };
+
+    const backendStatus = toBackend(next);
+    if (!backendStatus) {
+      alert('Hành động này chưa được hỗ trợ bởi backend. Vui lòng sử dụng Hoàn thành hoặc Hủy.');
+      return;
+    }
+
+    try {
+      const updated = await updateBillingStatus(Number(id), backendStatus);
+      // Map backend returned status to FE OrderStatus
+      const newStatus: OrderStatus = ((): OrderStatus => {
+        switch (updated.status) {
+          case 'PENDING': return 'pending';
+          case 'PAYED': return 'completed';
+          case 'CANCELLED': return 'cancelled';
+          default: return 'pending';
+        }
+      })();
+
+      setOrders(prev => prev.map(o => (o.id === String(updated.id) ? { ...o, status: newStatus } : o)));
+    } catch (e: any) {
+      alert(e?.message || 'Cập nhật trạng thái thất bại');
+    }
   };
 
   const actionOptions = (status: OrderStatus): { label: string; value: OrderStatus }[] => {
+    // Backend only supports PAYED and CANCELLED transitions. Offer only meaningful actions.
     switch (status) {
       case 'pending':
-        return [
-          { label: 'Xác nhận', value: 'confirmed' },
-          { label: 'Hủy', value: 'cancelled' },
-        ];
       case 'confirmed':
         return [
-          { label: 'Bắt đầu thuê', value: 'ongoing' },
+          { label: 'Đánh dấu đã thanh toán', value: 'completed' },
           { label: 'Hủy', value: 'cancelled' },
         ];
       case 'ongoing':
@@ -164,6 +223,11 @@ const StationStaffOrders = () => {
           </div>
 
           <div className="overflow-x-auto">
+            {loading ? (
+              <div className="p-4">Đang tải...</div>
+            ) : error ? (
+              <div className="p-4 text-red-600">{error}</div>
+            ) : null}
             <Table>
               <TableHeader>
                 <TableRow>
@@ -184,13 +248,15 @@ const StationStaffOrders = () => {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Car className="w-4 h-4 text-gray-500" />
-                        {o.vehicleName} ({o.plate})
+                        {o.vehicleName}
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="space-y-0.5">
-                        <div className="flex items-center gap-2"><User className="w-4 h-4 text-gray-500" />{o.customerName}</div>
-                        <div className="flex items-center gap-2 text-sm text-gray-600"><Phone className="w-4 h-4" />{o.customerPhone}</div>
+                        <div className="flex items-center gap-2"><User className="w-4 h-4 text-gray-500" />{o.customerName || 'Khách lẻ'}</div>
+                        {o.customerPhone && (
+                          <div className="flex items-center gap-2 text-sm text-gray-600"><Phone className="w-4 h-4" />{o.customerPhone}</div>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>

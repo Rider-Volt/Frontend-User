@@ -1,6 +1,7 @@
-import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, DollarSign, Route, Bus, Users, Menu, X, Map, Calendar, Clock, UserCog, Car } from 'lucide-react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { LayoutDashboard, DollarSign, Users, Menu, X, Map, Calendar, Car, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { staffLogout } from '@/services/authService';
 
 interface StationStaffSidebarProps {
   isOpen: boolean;
@@ -8,6 +9,8 @@ interface StationStaffSidebarProps {
 }
 
 const StationStaffSidebar = ({ isOpen, onToggle }: StationStaffSidebarProps) => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const navigationItems = [
     {
       name: 'Bảng điều khiển',
@@ -17,7 +20,7 @@ const StationStaffSidebar = ({ isOpen, onToggle }: StationStaffSidebarProps) => 
     },
     {
       name: 'Doanh thu',
-      href: '/StationStaff/',
+      href: '/StationStaff/revenue',
       icon: DollarSign
     },
     {
@@ -42,6 +45,11 @@ const StationStaffSidebar = ({ isOpen, onToggle }: StationStaffSidebarProps) => 
     },
     
   ];
+
+  const onLogout = () => {
+    staffLogout();
+    navigate('/StationStaff/login', { replace: true });
+  };
 
   return (
     <div className={`bg-white shadow-xl transition-all duration-300 ${isOpen ? 'w-64' : 'w-16'} fixed h-full z-20 border-r border-gray-200`}>
@@ -68,35 +76,36 @@ const StationStaffSidebar = ({ isOpen, onToggle }: StationStaffSidebarProps) => 
       {/* Navigation Menu */}
       <nav className="mt-6 px-3">
         {navigationItems.map((item) => (
-          <NavLink
-            key={item.name}
-            to={item.href}
-            end={item.end}
-            className={({ isActive }) =>
-              `flex items-center px-3 py-3 mb-2 rounded-lg text-sm font-medium transition-all duration-200 group ${
-                isActive
-                  ? 'bg-green-500 text-white shadow-md'
-                  : 'text-gray-700 hover:bg-green-50 hover:text-green-700'
-              }`
-            }
-          >
-            <item.icon className={`h-5 w-5 ${isOpen ? 'mr-3' : 'mx-auto'} flex-shrink-0`} />
-            {isOpen && (
-              <span className="truncate">{item.name}</span>
-            )}
-            
-            {/* Tooltip for collapsed state */}
+          <div key={item.name} className="relative group">
+            <Link
+              to={item.href}
+              className={`flex items-center px-3 py-3 mb-2 rounded-lg text-sm font-medium transition-all duration-200 text-gray-700 hover:bg-green-50 hover:text-green-700`}
+            >
+              <item.icon className={`h-5 w-5 ${isOpen ? 'mr-3' : 'mx-auto'} flex-shrink-0`} />
+              {isOpen && (
+                <span className="truncate">{item.name}</span>
+              )}
+            </Link>
             {!isOpen && (
-              <div className="absolute left-16 px-2 py-1 bg-gray-800 text-white text-xs rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50">
+              <div className="absolute left-16 top-1/2 -translate-y-1/2 px-2 py-1 bg-gray-800 text-white text-xs rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50 pointer-events-none">
                 {item.name}
               </div>
             )}
-          </NavLink>
+          </div>
         ))}
       </nav>
 
-      {/* Sidebar Background Accent */}
-      <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-green-50 to-transparent pointer-events-none opacity-30"></div>
+      {/* Footer with Logout */}
+      <div className="absolute bottom-0 left-0 right-0">
+        <button
+          onClick={onLogout}
+          className={`m-3 w-[calc(100%-1.5rem)] flex items-center ${isOpen ? 'justify-start' : 'justify-center'} px-3 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition`}
+        >
+          <LogOut className={`h-5 w-5 ${isOpen ? 'mr-2' : ''}`} />
+          {isOpen && <span>Đăng xuất</span>}
+        </button>
+        <div className="h-20 bg-gradient-to-t from-green-50 to-transparent pointer-events-none opacity-30" />
+      </div>
     </div>
   );
 };

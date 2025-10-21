@@ -25,7 +25,9 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      if (!recaptchaToken) {
+      const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY as string | undefined;
+      const canSkipCaptcha = (import.meta as any).env?.DEV && !siteKey;
+      if (!recaptchaToken && !canSkipCaptcha) {
         toast({
           title: "Vui lòng xác minh reCAPTCHA",
           description: "Hãy tích vào ô Tôi không phải người máy",
@@ -116,7 +118,15 @@ const Login = () => {
                 <RecaptchaV2 onVerify={setRecaptchaToken} />
               </div>
 
-              <Button type="submit" className="w-full" disabled={isLoading || !recaptchaToken}>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={(() => {
+                  const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY as string | undefined;
+                  const canSkipCaptcha = (import.meta as any).env?.DEV && !siteKey;
+                  return isLoading || (!recaptchaToken && !canSkipCaptcha);
+                })()}
+              >
                 {isLoading ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { CalendarIcon, CarFront, MapPin, Search } from "lucide-react";
 
@@ -18,9 +18,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { API_BASE } from "@/services/authService";
 
 // ================== Types ==================
-export type VehicleType = "" | "E-Scooter" | "E-Bike" | "E-Car";
+// Vehicle types are dynamic from DB, keep as string with empty meaning "all"
+export type VehicleType = string;
 
 interface SearchBarProps {
   onSubmit: (params: {
@@ -58,6 +60,7 @@ export default function SearchBar({ onSubmit, defaultValues }: SearchBarProps) {
   const [startDate, setStartDate] = useState<Date | undefined>();
   const [endDate, setEndDate] = useState<Date | undefined>();
   const [vehicleType, setVehicleType] = useState<VehicleType>("");
+  const [availableTypes, setAvailableTypes] = useState<string[]>([]);
 
   const [startOpen, setStartOpen] = useState(false);
   const [endOpen, setEndOpen] = useState(false);
@@ -96,6 +99,35 @@ export default function SearchBar({ onSubmit, defaultValues }: SearchBarProps) {
     if (s) setStartDate(s);
     if (e) setEndDate(e);
   }, [defaultValues?.location, defaultValues?.vehicleType, defaultValues?.startDate, defaultValues?.endDate]);
+
+  // Load types dynamically from backend models to stay in-sync with DB
+  useEffect(() => {
+    let cancelled = false;
+    type ModelMin = { type?: string | null };
+    const load = async () => {
+      try {
+        const resp = await fetch(`${API_BASE}/models`);
+        if (!resp.ok) return;
+        const list = (await resp.json()) as ModelMin[];
+        const uniq: string[] = [];
+        const seen = new Set<string>();
+        for (const m of list) {
+          const t = (m.type || "").trim();
+          if (!t) continue;
+          const key = t.toLowerCase();
+          if (!seen.has(key)) {
+            seen.add(key);
+            uniq.push(t);
+          }
+        }
+        if (!cancelled) setAvailableTypes(uniq);
+      } catch {
+        // ignore: fall back to static empty list (only shows "Tất cả")
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, []);
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -231,13 +263,13 @@ export default function SearchBar({ onSubmit, defaultValues }: SearchBarProps) {
               }
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Chọn loại xe" />
+                <SelectValue placeholder="Chọn loại xe (tùy chọn)" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tất cả</SelectItem>
-                <SelectItem value="E-Scooter">E-Scooter</SelectItem>
-                <SelectItem value="E-Bike">E-Bike</SelectItem>
-                <SelectItem value="E-Car">E-Car</SelectItem>
+                {availableTypes.map((t) => (
+                  <SelectItem key={t} value={t}>{t}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

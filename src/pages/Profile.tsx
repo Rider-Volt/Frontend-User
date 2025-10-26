@@ -8,12 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { User, Mail, Phone, MapPin, Star, Home, Car, IdCard, Image as ImageIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import Navbar from "../components/heroUi/Navbar"; // ✅ thêm Navbar
-import {
-  getCurrentUser,
-  fetchProfileFromAPI,
-  updateUser,
-  LoginResponse,
-} from "@/services/authService";
+import { getCurrentUser, refreshCurrentUser, updateUser, LoginResponse } from "@/services/authService";
 
 const Profile = () => {
   const [profile, setProfile] = useState<LoginResponse | null>(null);
@@ -120,25 +115,30 @@ const Profile = () => {
     }
   }, []);
 
-  // Refresh từ API
   useEffect(() => {
-    const run = async () => {
+    let active = true;
+    (async () => {
       try {
-        const fresh = await fetchProfileFromAPI();
-        setProfile(fresh);
+        const refreshed = await refreshCurrentUser();
+        if (!active) return;
+        setProfile(refreshed);
         setEditData({
-          full_name: fresh.full_name || fresh.username,
-          email: fresh.email || "",
-          phone: fresh.phone || "",
-          address: fresh.address || "",
+          full_name: refreshed.full_name || refreshed.username,
+          email: refreshed.email || "",
+          phone: refreshed.phone || "",
+          address: refreshed.address || "",
         });
-      } catch (e) {
-        console.warn("Không làm mới hồ sơ từ API:", e);
+      } catch (err) {
+        console.warn("Không thể đồng bộ hồ sơ từ máy chủ", err);
       } finally {
-        setLoading(false);
+        if (active) {
+          setLoading(false);
+        }
       }
+    })();
+    return () => {
+      active = false;
     };
-    run();
   }, []);
 
   useEffect(

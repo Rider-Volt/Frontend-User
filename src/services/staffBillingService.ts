@@ -1,73 +1,189 @@
 import { API_BASE } from "@/services/authService";
 
-export type BillingStatus = "PENDING" | "PAYED" | "CANCELLED" | "RENTING" | "APPROVED" | "COMPLETED";
+export type StaffBillingStatus =
+  | "WAITING"
+  | "PAYED"
+  | "RENTING"
+  | "DONE"
+  | "CANCELLED";
 
-export interface BillingResponse {
+export interface StaffBillingResponse {
   id: number;
-  rentedDay: number;
-  bookingTime: string; // ISO
-  startTime: string; // ISO
-  endTime: string; // ISO
+  renterId: number;
+  renterName: string;
+  renterEmail?: string | null;
+  vehicleId: number;
+  vehicleModel?: string | null;
+  rentedDay?: number | null;
+  bookingTime?: string | null;
+  startTime?: string | null;
+  endTime?: string | null;
   preImage?: string | null;
   finalImage?: string | null;
-  status: BillingStatus;
-  vehicleId?: number;
-  vehicleModel?: string;
-  renterId?: number;
-  renterName?: string;
-  renterEmail?: string;
-  renterPhone?: string;
-  renter?: {
-    id?: number;
-    name?: string;
-    phone?: string;
-    email?: string;
-  } | null;
-  vehicle?: {
-    id?: number;
-    code?: string;
-    station?: { id?: number; name?: string } | null;
-    model?: { id?: number; name?: string; photoUrl?: string; type?: string; pricePerDay?: number | string } | null;
-  } | null;
+  status: StaffBillingStatus;
+  penaltyCost?: number | null;
+  note?: string | null;
+}
+
+interface UpdateImagePayload {
+  preImage?: string;
+  finalImage?: string;
+}
+
+interface CheckInPayload {
+  preImage?: string;
+}
+
+export interface ReturnInspectionPayload {
+  finalImage: string;
+  penaltyCost?: number;
+  note?: string;
 }
 
 function authHeaders(): HeadersInit {
-  // Use dedicated staff token, not renter token
   const token = localStorage.getItem("staff_token") || "";
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  return {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    "Content-Type": "application/json",
+  };
 }
 
-export async function getStationBillings(): Promise<BillingResponse[]> {
+async function handleResponse<T>(resp: Response, fallback: string): Promise<T> {
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => resp.statusText);
+    const message = text || `${fallback} (HTTP ${resp.status})`;
+    throw new Error(message);
+  }
+  const data = (await resp.json().catch(() => null)) as T | null;
+  if (data === null) {
+    throw new Error("Không đọc được dữ liệu phản hồi từ máy chủ.");
+  }
+  return data;
+}
+
+function requireStaffToken(): void {
+  if (!localStorage.getItem("staff_token")) {
+    throw new Error("Bạn cần đăng nhập tài khoản nhân viên để sử dụng chức năng này.");
+  }
+}
+
+export async function getStationBillings(): Promise<StaffBillingResponse[]> {
+  requireStaffToken();
   const resp = await fetch(`${API_BASE}/staff/billings/station`, {
     method: "GET",
-    headers: { ...authHeaders() },
+    headers: authHeaders(),
   });
-  if (!resp.ok) {
-    if (resp.status === 401 || resp.status === 403) {
-      throw new Error("Bạn không có quyền hoặc chưa đăng nhập nhân viên. Vui lòng đăng nhập lại.");
-    }
-    const text = await resp.text().catch(() => resp.statusText);
-    throw new Error(text || `Failed to load station billings (${resp.status})`);
-  }
-  return (await resp.json()) as BillingResponse[];
+  return handleResponse<StaffBillingResponse[]>(
+    resp,
+    "Không tải được danh sách hóa đơn theo trạm"
+  );
 }
 
-export async function updateBillingStatus(
+export async function updatePreImage(
   id: number,
-  status: BillingStatus
-): Promise<BillingResponse> {
-  const url = new URL(`${API_BASE}/staff/billings/${id}/status`);
-  url.searchParams.set("status", status);
-  const resp = await fetch(url.toString(), {
+  preImage: string
+): Promise<StaffBillingResponse> {
+  requireStaffToken();
+  const resp = await fetch(`${API_BASE}/staff/billings/${id}/pre-image`, {
     method: "PATCH",
-    headers: { ...authHeaders() },
+    headers: authHeaders(),
+    body: JSON.stringify({ preImage }),
   });
-  if (!resp.ok) {
-    if (resp.status === 401 || resp.status === 403) {
-      throw new Error("Bạn không có quyền cập nhật. Vui lòng đăng nhập nhân viên.");
-    }
-    const text = await resp.text().catch(() => resp.statusText);
-    throw new Error(text || `Failed to update billing status (${resp.status})`);
-  }
-  return (await resp.json()) as BillingResponse;
+  return handleResponse<StaffBillingResponse>(
+    resp,
+    "Không cập nhật được hình ảnh trước khi nhận xe"
+  );
+}
+
+export async function updateFinalImage(
+  id: number,
+  finalImage: string
+): Promise<StaffBillingResponse> {
+  requireStaffToken();
+  const resp = await fetch(`${API_BASE}/staff/billings/${id}/final-image`, {
+    method: "PATCH",
+    headers: authHeaders(),
+    body: JSON.stringify({ finalImage }),
+  });
+  return handleResponse<StaffBillingResponse>(
+    resp,
+    "Không cập nhật được hình ảnh khi trả xe"
+  );
+}
+
+export async function approvePayment(
+  id: number
+): Promise<StaffBillingResponse> {
+  requireStaffToken();
+  const resp = await fetch(`${API_BASE}/staff/billings/${id}/approve-payment`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+  return handleResponse<StaffBillingResponse>(
+    resp,
+    "Không duyệt được thanh toán"
+  );
+}
+
+export async function checkInBilling(
+  id: number,
+  payload?: CheckInPayload
+): Promise<StaffBillingResponse> {
+  requireStaffToken();
+  const resp = await fetch(`${API_BASE}/staff/billings/${id}/check-in`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: payload ? JSON.stringify(payload) : "{}",
+  });
+  return handleResponse<StaffBillingResponse>(
+    resp,
+    "Không thực hiện được thao tác check-in"
+  );
+}
+
+export async function checkInByPhone(
+  phone: string,
+  payload?: CheckInPayload
+): Promise<StaffBillingResponse> {
+  requireStaffToken();
+  const endpoint = `${API_BASE}/staff/billings/check-in/by-phone?phone=${encodeURIComponent(phone)}`;
+  const resp = await fetch(endpoint, {
+    method: "POST",
+    headers: authHeaders(),
+    body: payload ? JSON.stringify(payload) : "{}",
+  });
+  return handleResponse<StaffBillingResponse>(
+    resp,
+    "Không tìm thấy hóa đơn phù hợp để check-in"
+  );
+}
+
+export async function inspectReturn(
+  id: number,
+  payload: ReturnInspectionPayload
+): Promise<StaffBillingResponse> {
+  requireStaffToken();
+  const resp = await fetch(`${API_BASE}/staff/billings/${id}/inspect-return`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<StaffBillingResponse>(
+    resp,
+    "Không thể ghi nhận kiểm tra xe trả"
+  );
+}
+
+export async function approvePenalty(
+  id: number
+): Promise<StaffBillingResponse> {
+  requireStaffToken();
+  const resp = await fetch(`${API_BASE}/staff/billings/${id}/approve-penalty`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+  return handleResponse<StaffBillingResponse>(
+    resp,
+    "Không thể duyệt thanh toán tiền phạt"
+  );
 }

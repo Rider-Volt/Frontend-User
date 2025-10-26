@@ -1,90 +1,29 @@
-﻿import { API_BASE } from "./authService";
+import type {
+  BillingStatus,
+  RenterBillingResponse,
+} from "./renterBillingService";
 
-export const BOOKING_ENDPOINT = `${API_BASE}/booking`;
 const BOOKING_STORAGE_PREFIX = "userBookings";
+const LEGACY_STORAGE_KEY = "userBookings";
 
 const buildStorageKey = (userId: number) =>
   `${BOOKING_STORAGE_PREFIX}:${userId}`;
 
-const LEGACY_STORAGE_KEY = "userBookings";
-
-export type BookingStatus =
-  | "PENDING"
-  | "APPROVED"
-  | "DENIED"
-  | "COMPLETED"
-  | "CANCELLED";
-
-export interface CreateBookingPayload {
-  userId: number;
-  model: string;
-  startTime: string;
-  endTime: string;
-  token?: string;
-}
-
-export interface BookingApiResponse {
-  bookingId: number;
-  userId: number;
-  userName: string;
-  vehicleId: number;
-  vehicleModel: string;
-  vehicleLicensePlate: string;
-  startTime: string;
-  endTime: string;
-  status: BookingStatus;
-  bookingType: string;
-  isActive?: boolean;
-  bookingTime: string;
-  message?: string;
-  success?: boolean;
-}
-
-export interface StoredBooking {
-  bookingId: number;
-  status: BookingStatus;
-  startTime: string;
-  endTime: string;
-  bookingTime: string;
-  vehicle: {
-    id?: number;
-    model: string;
-    name?: string;
-    type?: string;
-    image?: string;
-    licensePlate?: string;
-  };
-  price?: number;
-  deposit?: number;
+export type StoredBooking = RenterBillingResponse & {
+  /**
+   * Legacy alias for id used by old UI code.
+   */
+  bookingId?: number;
+  /**
+   * UI-only enrichment captured at booking time.
+   */
+  localVehicleName?: string;
+  localVehicleImage?: string;
   totalCharge?: number;
   pickupLocation?: string;
   paymentMethod?: string;
-}
-
-function authHeaders(token?: string) {
-  return {
-    "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-}
-
-export async function createBooking(payload: CreateBookingPayload): Promise<BookingApiResponse> {
-  const { token, ...body } = payload;
-
-  const resp = await fetch(BOOKING_ENDPOINT, {
-    method: "POST",
-    headers: authHeaders(token),
-    body: JSON.stringify(body),
-  });
-
-  const data = await resp.json().catch(() => ({}));
-
-  if (!resp.ok) {
-    throw new Error(data.message || "KhĂ´ng thá»ƒ táº¡o Ä‘áº·t xe. Vui lĂ²ng thá»­ láº¡i.");
-  }
-
-  return data as BookingApiResponse;
-}
+  // deposit field removed
+};
 
 function migrateLegacyHistory(userId: number) {
   const legacy = localStorage.getItem(LEGACY_STORAGE_KEY);
@@ -96,16 +35,58 @@ function migrateLegacyHistory(userId: number) {
   }
 }
 
-export function appendBookingHistory(userId: number | undefined, entry: StoredBooking) {
+function normalizeStored(entry: StoredBooking): StoredBooking {
+  const bookingId = entry.id ?? entry.bookingId;
+  if (bookingId === undefined || bookingId === null) {
+    throw new Error("Thiếu mã billing khi lưu lịch sử đặt xe");
+  }
+  const legacy = entry as StoredBooking & {
+    startTime?: string;
+    endTime?: string;
+    totalPrice?: number;
+    price?: number;
+  };
+  const statusCandidate = entry.status as BillingStatus | string | undefined;
+  const statusMap: Record<string, BillingStatus> = {
+    PENDING: "WAITING",
+    APPROVED: "PAYED",
+    COMPLETED: "DONE",
+    DENIED: "CANCELLED",
+    CANCELLED: "CANCELLED",
+  };
+  const normalStatus =
+    typeof statusCandidate === "string" &&
+    (BookingStatuses as readonly string[]).includes(statusCandidate)
+      ? (statusCandidate as BillingStatus)
+      : statusMap[String(statusCandidate).toUpperCase()] || "WAITING";
+  const startDay = entry.startDay ?? legacy.startTime ?? "";
+  const endDay = entry.endDay ?? legacy.endTime ?? "";
+  const totalCost =
+    entry.totalCost ?? legacy.totalPrice ?? legacy.price ?? undefined;
+  return {
+    ...entry,
+    id: bookingId,
+    bookingId,
+    status: normalStatus,
+    startDay,
+    endDay,
+    totalCost,
+  };
+}
+
+export function appendBookingHistory(
+  userId: number | undefined,
+  entry: StoredBooking
+) {
   if (!userId) return;
 
   migrateLegacyHistory(userId);
   const key = buildStorageKey(userId);
 
-  const normalizedEntry: StoredBooking = { ...entry };
+  const normalizedEntry = normalizeStored(entry);
   const existing = getBookingHistory(userId);
   const next = [
-    ...existing.filter((item) => item.bookingId !== entry.bookingId),
+    ...existing.filter((item) => (item.id ?? item.bookingId) !== normalizedEntry.id),
     normalizedEntry,
   ];
 
@@ -122,11 +103,25 @@ export function getBookingHistory(userId?: number): StoredBooking[] {
 
   try {
     const parsed = JSON.parse(raw) as StoredBooking[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (_err) {
-    console.warn("KhĂ´ng thá»ƒ Ä‘á»c lá»‹ch sá»­ booking trong localStorage");
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((item) => normalizeStored(item));
+  } catch (err) {
+    console.warn("Không thể đọc lịch sử booking trong localStorage", err);
     return [];
   }
+}
+
+export function saveBookingHistory(
+  userId: number | undefined,
+  entries: StoredBooking[]
+) {
+  if (!userId) return;
+  migrateLegacyHistory(userId);
+  const key = buildStorageKey(userId);
+  localStorage.setItem(
+    key,
+    JSON.stringify(entries.map((entry) => normalizeStored(entry)))
+  );
 }
 
 export function clearBookingHistory(userId?: number) {
@@ -136,9 +131,11 @@ export function clearBookingHistory(userId?: number) {
   }
   localStorage.removeItem(buildStorageKey(userId));
 }
-export function saveBookingHistory(userId: number | undefined, entries: StoredBooking[]) {
-  if (!userId) return;
-  migrateLegacyHistory(userId);
-  const key = buildStorageKey(userId);
-  localStorage.setItem(key, JSON.stringify(entries));
-}
+
+export const BookingStatuses: BillingStatus[] = [
+  "WAITING",
+  "PAYED",
+  "RENTING",
+  "DONE",
+  "CANCELLED",
+];

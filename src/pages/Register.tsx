@@ -5,6 +5,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Car, Mail, Lock, Eye, EyeOff, User, Phone, Loader2 } from "lucide-react";
+import RecaptchaV2 from "@/components/RecaptchaV2";
+import { register as registerApi } from "@/services/authService";
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -17,8 +19,13 @@ const Register = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
 
   const navigate = useNavigate();
+  const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY as string | undefined;
+  const canSkipCaptcha =
+    (import.meta as any).env?.DEV && (!siteKey || siteKey.length === 0);
+  const isSubmitDisabled = loading || (!recaptchaToken && !canSkipCaptcha);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -28,7 +35,7 @@ const Register = () => {
     if (!formData.fullName.trim()) return "Vui lòng nhập họ và tên";
     if (!/\S+@\S+\.\S+/.test(formData.email)) return "Email không hợp lệ";
     if (!/^[0-9]{9,11}$/.test(formData.phone)) return "Số điện thoại không hợp lệ";
-    if (formData.password.length < 6) return "Mật khẩu phải ít nhất 6 ký tự";
+    if (formData.password.length < 8) return "Mật khẩu phải ít nhất 8 ký tự";
     if (formData.password !== formData.confirmPassword)
       return "Mật khẩu xác nhận không khớp";
     return null;
@@ -44,33 +51,27 @@ const Register = () => {
 
     setLoading(true);
     try {
-      const response = await fetch(
-        "https://ridervolt-761a9cacc040.herokuapp.com/api/register",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            fullName: formData.fullName,
-            email: formData.email,
-            phone: formData.phone,
-            password: formData.password
-          })
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        alert(`Đăng ký thất bại: ${data.message || "Lỗi server"}`);
-      } else {
-        alert("Đăng ký thành công!");
-        navigate("/login");
+      if (!recaptchaToken && !canSkipCaptcha) {
+        alert("Vui lòng xác minh reCAPTCHA");
+        return;
       }
+
+      await registerApi({
+        fullName: formData.fullName.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone.trim(),
+        password: formData.password,
+        recaptchaToken:
+          recaptchaToken || (canSkipCaptcha ? "dev-bypass" : ""),
+      });
+
+      alert("Đăng ký thành công!");
+      navigate("/login");
     } catch (error) {
       console.error("Lỗi khi đăng ký:", error);
-      alert("Không thể kết nối đến server!");
+      const message =
+        error instanceof Error ? error.message : "Không thể kết nối đến server!";
+      alert(`Đăng ký thất bại: ${message}`);
     } finally {
       setLoading(false);
     }
@@ -217,11 +218,15 @@ const Register = () => {
                     </div>
                   </div>
 
+                  <div className="flex justify-center">
+                    <RecaptchaV2 onVerify={setRecaptchaToken} />
+                  </div>
+
                   {/* Submit */}
                   <Button
                     type="submit"
                     className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-3 rounded-xl transition-colors"
-                    disabled={loading}
+                    disabled={isSubmitDisabled}
                   >
                     {loading ? (
                       <>

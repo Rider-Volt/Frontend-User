@@ -3,15 +3,37 @@
 // In development, always route through the Vite proxy at /api to avoid CORS
 export const API_BASE = import.meta.env.DEV ? "/api" : "https://backend.ridervolt.app/api";
 
-// Cho phép chỉnh endpoint nếu BE khác tên
+// Endpoints cho renter/admin/staff (chỉ dùng API mới của BE)
 export const PROFILE_ENDPOINTS = {
-  me: `${API_BASE}/user/me`,          // GET thông tin hồ sơ theo token
-  update: `${API_BASE}/user/me`,      // PATCH cập nhật hồ sơ
-  // BE quy định renter login tại /renter/login
   login: `${API_BASE}/renter/login`,
   logout: `${API_BASE}/logout`,
   register: `${API_BASE}/register`,
+  renterMe: `${API_BASE}/renter/me`,
 };
+// Gọi /api/renter/me để lấy id và thông tin profile
+export async function fetchRenterMe(token?: string): Promise<RenterProfileApiResponse> {
+  const effectiveToken = token || getAuthToken();
+  const resp = await fetch(PROFILE_ENDPOINTS.renterMe, {
+    method: "GET",
+    headers: authHeaders(effectiveToken),
+  });
+
+  let data: any = {};
+  try {
+    data = await resp.json();
+  } catch {
+    data = {};
+  }
+
+  if (!resp.ok) {
+    const message =
+      (typeof data?.message === "string" && data.message) ||
+      "Không lấy được thông tin renter/me";
+    throw new Error(message);
+  }
+
+  return (data || {}) as RenterProfileApiResponse;
+}
 
 // Staff endpoints
 export const STAFF_ENDPOINTS = {
@@ -42,9 +64,10 @@ export interface LoginResponse {
   // URL ảnh giấy tờ
   nationalIdImageUrl?: string;
   driverLicenseImageUrl?: string;
+  verified?: boolean;
 }
 
-interface ProfileApiResponse {
+export interface RenterProfileApiResponse {
   id?: number;
   fullName?: string;
   email?: string;
@@ -57,6 +80,7 @@ interface ProfileApiResponse {
   // URL ảnh giấy tờ nếu BE trả về
   nationalIdImageUrl?: string;
   driverLicenseImageUrl?: string;
+  verified?: boolean;
 }
 
 export interface UpdateUserPayload {
@@ -66,6 +90,7 @@ export interface UpdateUserPayload {
   address?: string;
   licenseNumber?: string;
   nationalId?: string;
+  password?: string;
   avatarFile?: File | null;
   // ảnh giấy tờ
   nationalIdImageFile?: File | null;
@@ -85,7 +110,11 @@ export interface RegisterResponseApi {
   id?: number;
 }
 
-function authHeaders(token?: string, contentType: string | null = "application/json") {
+export function getAuthToken(): string | undefined {
+  return localStorage.getItem("token") || undefined;
+}
+
+export function authHeaders(token?: string, contentType: string | null = "application/json") {
   const headers: Record<string, string> = {};
   if (contentType) {
     headers["Content-Type"] = contentType;
@@ -94,6 +123,105 @@ function authHeaders(token?: string, contentType: string | null = "application/j
     headers.Authorization = `Bearer ${token}`;
   }
   return headers;
+}
+
+// Helpers to normalize ids from various backend payloads or JWT
+function toSafeNumber(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return undefined;
+}
+
+function extractIdFromToken(token?: string): number | undefined {
+  if (!token) return undefined;
+  try {
+    const parts = token.split(".");
+    if (parts.length < 2) return undefined;
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+    // Try common claim keys
+    return (
+      toSafeNumber(payload?.userId) ||
+      toSafeNumber(payload?.id) ||
+      toSafeNumber(payload?.renterId) ||
+      toSafeNumber(payload?.sub)
+    );
+  } catch {
+    return undefined;
+  }
+}
+
+interface LoginTokens {
+  accessToken: string;
+  refreshToken?: string;
+  renterName?: string;
+  status?: string;
+}
+
+function mergeLoginState(
+  tokens: LoginTokens,
+  profile: RenterProfileApiResponse | undefined,
+  previous: LoginResponse | null
+): LoginResponse {
+  const base = previous || ({} as LoginResponse);
+  const trimmedName = profile?.fullName?.trim();
+  const fallbackName =
+    trimmedName ||
+    tokens.renterName ||
+    base.full_name ||
+    base.username ||
+    base.email ||
+    "";
+  const resolvedId =
+    toSafeNumber(profile?.id) ??
+    extractIdFromToken(tokens.accessToken) ??
+    toSafeNumber(base.id) ??
+    toSafeNumber(base.userId);
+
+  return {
+    accessToken: tokens.accessToken,
+    refreshToken: tokens.refreshToken ?? base.refreshToken,
+    username: fallbackName || base.username || "",
+    full_name: fallbackName || base.full_name,
+    email: profile?.email ?? base.email,
+    status: tokens.status ?? base.status,
+    is_active: base.is_active,
+    phone: profile?.phone ?? base.phone,
+    avatar: profile?.avatarUrl ?? base.avatar,
+    address: base.address,
+    joinDate: base.joinDate,
+    totalBookings: base.totalBookings,
+    totalSpent: base.totalSpent,
+    rating: base.rating,
+    id: resolvedId,
+    userId: resolvedId,
+    licenseNumber: profile?.driverLicense ?? base.licenseNumber,
+    nationalId: profile?.nationalId ?? base.nationalId,
+    nationalIdImageUrl: profile?.nationalIdImageUrl ?? base.nationalIdImageUrl,
+    driverLicenseImageUrl:
+      profile?.driverLicenseImageUrl ?? base.driverLicenseImageUrl,
+    verified:
+      typeof profile?.verified === "boolean" ? profile.verified : base.verified,
+  };
+}
+
+function mergeProfileOnly(
+  current: LoginResponse,
+  profile?: RenterProfileApiResponse
+): LoginResponse {
+  if (!profile) return current;
+  return mergeLoginState(
+    {
+      accessToken: current.accessToken,
+      refreshToken: current.refreshToken,
+      renterName: current.full_name || current.username,
+      status: current.status,
+    },
+    profile,
+    current
+  );
 }
 
 // Đăng ký
@@ -117,12 +245,16 @@ export async function register(payload: RegisterPayload): Promise<RegisterRespon
 export async function login(email: string, password: string, recaptchaToken?: string): Promise<LoginResponse> {
   const resp = await fetch(PROFILE_ENDPOINTS.login, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "Accept": "application/json" },
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({ email, password, recaptchaToken }),
   });
 
   let data: any = {};
-  try { data = await resp.json(); } catch { data = {}; }
+  try {
+    data = await resp.json();
+  } catch {
+    data = {};
+  }
 
   if (!resp.ok) {
     const status = resp.status;
@@ -130,45 +262,31 @@ export async function login(email: string, password: string, recaptchaToken?: st
     throw new Error(`HTTP ${status}: ${base}`);
   }
 
-  const userData: LoginResponse = {
+  if (typeof data?.accessToken !== "string" || !data.accessToken) {
+    throw new Error("Phản hồi đăng nhập không hợp lệ: thiếu accessToken");
+  }
+
+  const tokens: LoginTokens = {
     accessToken: data.accessToken,
     refreshToken: data.refreshToken,
-    // RenterAuthResponse trả về renterName
-    username: data.renterName || email,
-    full_name: data.renterName,
-    email: data.email || email,
-    status: data.status || "ACTIVE",
-    is_active: data.is_active ?? true,
-    phone: data.phone || "",
-    avatar: data.avatar || "",
-    address: data.address || "",
-    joinDate: data.joinDate || undefined,
-    totalBookings: data.totalBookings || 0,
-    totalSpent: data.totalSpent || 0,
-    rating: data.rating || 5,
-    id: typeof data.id === "number" ? data.id : undefined,
-    userId: typeof data.userId === "number" ? data.userId : undefined,
-    licenseNumber: data.licenseNumber || "",
+    renterName: data.renterName || data.username,
+    status: typeof data.status === "string" ? data.status : undefined,
   };
 
-  localStorage.setItem("token", userData.accessToken);
-  localStorage.setItem("user", JSON.stringify(userData));
-
+  let profile: RenterProfileApiResponse | undefined;
   try {
-    const profile = await fetchProfileFromAPI();
-    const merged: LoginResponse = {
-      ...userData,
-      ...profile,
-      accessToken: userData.accessToken,
-      refreshToken: userData.refreshToken,
-      username: profile.username || profile.full_name || userData.username,
-      full_name: profile.full_name || profile.username || userData.full_name,
-    };
-    localStorage.setItem("user", JSON.stringify(merged));
-    return merged;
+    profile = await fetchRenterMe(tokens.accessToken);
   } catch {
-    return userData;
+    profile = undefined;
   }
+
+  const previous = getCurrentUser();
+  const merged = mergeLoginState(tokens, profile, previous);
+
+  localStorage.setItem("token", merged.accessToken);
+  localStorage.setItem("user", JSON.stringify(merged));
+
+  return merged;
 }
 
 // Lấy user hiện tại từ localStorage (không gọi mạng)
@@ -178,123 +296,177 @@ export function getCurrentUser(): LoginResponse | null {
   return JSON.parse(u) as LoginResponse;
 }
 
-// Gọi API lấy hồ sơ theo token (nếu BE hỗ trợ /user/me)
 export async function fetchProfileFromAPI(): Promise<LoginResponse> {
-  const token = localStorage.getItem("token") || "";
-  const resp = await fetch(PROFILE_ENDPOINTS.me, {
-    method: "GET",
-    headers: authHeaders(token),
-  });
+  return refreshCurrentUser();
+}
 
-  const data: ProfileApiResponse = await resp.json().catch(() => ({} as ProfileApiResponse));
-  if (!resp.ok) {
-    throw new Error(data.message || "Không lấy được hồ sơ");
+export async function refreshCurrentUser(): Promise<LoginResponse> {
+  const token = getAuthToken();
+  if (!token) {
+    throw new Error("Bạn chưa đăng nhập");
   }
-
-  // Ghép vào local user (giữ accessToken cũ nếu BE không trả lại)
   const current = getCurrentUser();
-  const inferredName = data.fullName || current?.full_name || current?.username || current?.email || "";
-  const parseNumeric = (value: unknown): number | undefined => {
-    if (typeof value === "number" && Number.isFinite(value)) return value;
-    if (typeof value === "string") {
-      const parsed = Number(value);
-      return Number.isFinite(parsed) ? parsed : undefined;
-    }
-    return undefined;
-  };
-  const normalizedId = data.id ?? parseNumeric(current?.id ?? current?.userId);
-
-  const merged: LoginResponse = {
-    ...(current || {}),
-    username: inferredName,
-    full_name: data.fullName ?? current?.full_name ?? inferredName,
-    email: data.email ?? current?.email,
-    phone: data.phone ?? current?.phone,
-    avatar: data.avatarUrl ?? current?.avatar,
-    licenseNumber: data.driverLicense ?? current?.licenseNumber,
-    nationalId: data.nationalId ?? current?.nationalId,
-    nationalIdImageUrl: data.nationalIdImageUrl ?? current?.nationalIdImageUrl,
-    driverLicenseImageUrl: data.driverLicenseImageUrl ?? current?.driverLicenseImageUrl,
-    id: normalizedId,
-    userId: normalizedId,
-    accessToken: current?.accessToken || token,
-  };
-
+  const profile = await fetchRenterMe(token);
+  const merged = mergeLoginState(
+    {
+      accessToken: token,
+      refreshToken: current?.refreshToken,
+      renterName: current?.full_name || current?.username,
+      status: current?.status,
+    },
+    profile,
+    current
+  );
   localStorage.setItem("user", JSON.stringify(merged));
   return merged;
 }
 
-// Cập nhật hồ sơ
-export async function updateUser(userPatch: UpdateUserPayload): Promise<LoginResponse> {
-  const token = localStorage.getItem("token") || "";
-  const hasAvatar = Boolean(userPatch.avatarFile);
-  const hasNationalIdImg = Boolean(userPatch.nationalIdImageFile);
-  const hasDriverLicenseImg = Boolean(userPatch.driverLicenseImageFile);
-  const payload = toBackendProfilePayload(userPatch);
+// Không còn dùng /user/me — hàm này được loại bỏ.
 
-  let body: BodyInit;
-  let headers: Record<string, string>;
+// Trả về userId hiện tại (ưu tiên localStorage, fallback decode JWT) và đồng bộ vào localStorage nếu thiếu
+export function getCurrentUserId(): number | undefined {
+  const current = getCurrentUser();
+  const direct = toSafeNumber(current?.id) || toSafeNumber(current?.userId);
+  if (direct) return direct;
 
-  if (hasAvatar || hasNationalIdImg || hasDriverLicenseImg) {
-    const formData = new FormData();
-    formData.append(
-      "data",
-      new Blob([JSON.stringify(payload)], { type: "application/json" })
-    );
-    if (userPatch.avatarFile) {
-      formData.append("avatar", userPatch.avatarFile);
-    }
-    if (userPatch.nationalIdImageFile) {
-      formData.append("nationalIdImage", userPatch.nationalIdImageFile);
-    }
-    if (userPatch.driverLicenseImageFile) {
-      formData.append("driverLicenseImage", userPatch.driverLicenseImageFile);
-    }
-    body = formData;
-    headers = authHeaders(token, null);
-  } else {
-    body = JSON.stringify(payload);
-    headers = authHeaders(token);
+  const token = localStorage.getItem("token") || undefined;
+  const fromJwt = extractIdFromToken(token);
+  if (fromJwt && current) {
+    const patched: LoginResponse = { ...current, id: fromJwt, userId: fromJwt };
+    localStorage.setItem("user", JSON.stringify(patched));
   }
+  return fromJwt;
+}
 
-  const resp = await fetch(PROFILE_ENDPOINTS.update, {
-    method: "PATCH",
-    headers,
-    body,
+async function uploadIdentityDocument(
+  field: "cccd" | "gplx",
+  file: File,
+  token: string
+): Promise<RenterProfileApiResponse> {
+  const form = new FormData();
+  form.append(field, file);
+  const resp = await fetch(`${API_BASE}/renter/${field === "cccd" ? "cccd" : "gplx"}`, {
+    method: "POST",
+    headers: authHeaders(token, null),
+    body: form,
   });
 
-  const data: ProfileApiResponse & { message?: string } =
-    (await resp.json().catch(() => ({}))) as ProfileApiResponse & { message?: string };
-
-  if (!resp.ok) {
-    throw new Error(data?.message || "Cập nhật thất bại");
+  let data: any = {};
+  try {
+    data = await resp.json();
+  } catch {
+    data = {};
   }
 
-  const current = getCurrentUser();
-  const merged: LoginResponse = {
-    ...(current || {}),
-    username:
-      data.fullName ??
-      current?.username ??
-      current?.full_name ??
-      current?.email ??
-      "",
-    full_name: data.fullName ?? current?.full_name,
-    email: data.email ?? current?.email,
-    phone: data.phone ?? current?.phone,
-    avatar: data.avatarUrl ?? current?.avatar,
-    licenseNumber: data.driverLicense ?? current?.licenseNumber,
-    nationalId: data.nationalId ?? current?.nationalId,
-    nationalIdImageUrl: data.nationalIdImageUrl ?? current?.nationalIdImageUrl,
-    driverLicenseImageUrl: data.driverLicenseImageUrl ?? current?.driverLicenseImageUrl,
-    id: data.id ?? current?.id ?? current?.userId,
-    userId: data.id ?? current?.userId ?? current?.id,
-    accessToken: current?.accessToken || token,
-    refreshToken: current?.refreshToken,
-  };
+  if (!resp.ok) {
+    const message =
+      (typeof data?.message === "string" && data.message) ||
+      `Không thể cập nhật ${field.toUpperCase()}`;
+    throw new Error(message);
+  }
 
-  localStorage.setItem("user", JSON.stringify(merged));
-  return merged;
+  return data as RenterProfileApiResponse;
+}
+
+// Cập nhật hồ sơ
+export async function updateUser(userPatch: UpdateUserPayload): Promise<LoginResponse> {
+  const current = getCurrentUser();
+  if (!current || !current.accessToken) {
+    throw new Error("Bạn cần đăng nhập trước khi cập nhật hồ sơ");
+  }
+
+  const token = current.accessToken;
+  const form = new FormData();
+  let hasProfileChange = false;
+
+  if (typeof userPatch.full_name === "string") {
+    const trimmed = userPatch.full_name.trim();
+    if (trimmed.length > 0 && trimmed !== (current.full_name || "")) {
+      form.append("name", trimmed);
+      hasProfileChange = true;
+    }
+  }
+
+  if (typeof userPatch.phone === "string") {
+    const trimmed = userPatch.phone.trim();
+    if (trimmed.length > 0 && trimmed !== (current.phone || "")) {
+      form.append("phone", trimmed);
+      hasProfileChange = true;
+    }
+  }
+
+  if (
+    typeof userPatch.password === "string" &&
+    userPatch.password.trim().length >= 8
+  ) {
+    form.append("password", userPatch.password.trim());
+    hasProfileChange = true;
+  }
+
+  if (userPatch.avatarFile instanceof File) {
+    form.append("avatar", userPatch.avatarFile);
+    hasProfileChange = true;
+  }
+
+  let nextState: LoginResponse = current;
+
+  if (hasProfileChange) {
+    const resp = await fetch(PROFILE_ENDPOINTS.renterMe, {
+      method: "PATCH",
+      headers: authHeaders(token, null),
+      body: form,
+    });
+
+    let data: any = {};
+    try {
+      data = await resp.json();
+    } catch {
+      data = {};
+    }
+
+    if (!resp.ok) {
+      const message =
+        (typeof data?.message === "string" && data.message) ||
+        "Không thể cập nhật hồ sơ";
+      throw new Error(message);
+    }
+
+    nextState = mergeProfileOnly(current, data as RenterProfileApiResponse);
+  }
+
+  // Upload CCCD nếu cần
+  if (userPatch.nationalIdImageFile instanceof File) {
+    const profileAfterCccd = await uploadIdentityDocument(
+      "cccd",
+      userPatch.nationalIdImageFile,
+      token
+    );
+    nextState = mergeProfileOnly(nextState, profileAfterCccd);
+  }
+
+  // Upload GPLX nếu cần
+  if (userPatch.driverLicenseImageFile instanceof File) {
+    const profileAfterGplx = await uploadIdentityDocument(
+      "gplx",
+      userPatch.driverLicenseImageFile,
+      token
+    );
+    nextState = mergeProfileOnly(nextState, profileAfterGplx);
+  }
+
+  // Các trường chỉ lưu local (address, licenseNumber, nationalId) vì BE chưa hỗ trợ
+  if (typeof userPatch.address === "string") {
+    nextState = { ...nextState, address: userPatch.address };
+  }
+  if (typeof userPatch.licenseNumber === "string") {
+    nextState = { ...nextState, licenseNumber: userPatch.licenseNumber };
+  }
+  if (typeof userPatch.nationalId === "string") {
+    nextState = { ...nextState, nationalId: userPatch.nationalId };
+  }
+
+  localStorage.setItem("user", JSON.stringify(nextState));
+  return nextState;
 }
 
 // Logout
@@ -331,27 +503,7 @@ export async function logoutApi(): Promise<void> {
   }
 }
 
-function toBackendProfilePayload(userPatch: UpdateUserPayload): Record<string, unknown> {
-  const payload: Record<string, unknown> = {};
-
-  if (userPatch.full_name !== undefined) {
-    payload.fullName = userPatch.full_name;
-  }
-  if (userPatch.email !== undefined) {
-    payload.email = userPatch.email;
-  }
-  if (userPatch.phone !== undefined) {
-    payload.phone = userPatch.phone;
-  }
-  if (userPatch.licenseNumber !== undefined) {
-    payload.driverLicense = userPatch.licenseNumber;
-  }
-  if (userPatch.nationalId !== undefined) {
-    payload.nationalId = userPatch.nationalId;
-  }
-
-  return payload;
-}
+// Đã bỏ mapper dành cho /user/me
 
 // Staff login (không cần reCAPTCHA)
 export interface StaffLoginResponse {

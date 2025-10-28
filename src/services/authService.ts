@@ -243,10 +243,34 @@ export async function register(payload: RegisterPayload): Promise<RegisterRespon
 
 // Đăng nhập
 export async function login(email: string, password: string, recaptchaToken?: string): Promise<LoginResponse> {
+  // Validation
+  if (!email?.trim()) {
+    throw new Error("Email không được để trống");
+  }
+  
+  if (!password?.trim()) {
+    throw new Error("Mật khẩu không được để trống");
+  }
+
+  // Email format validation
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email.trim())) {
+    throw new Error("Email không hợp lệ");
+  }
+
+  const payload: { email: string; password: string; recaptchaToken?: string } = {
+    email: email.trim(),
+    password: password.trim(),
+  };
+
+  if (recaptchaToken?.trim()) {
+    payload.recaptchaToken = recaptchaToken.trim();
+  }
+
   const resp = await fetch(PROFILE_ENDPOINTS.login, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({ email, password, recaptchaToken }),
+    body: JSON.stringify(payload),
   });
 
   let data: any = {};
@@ -258,8 +282,28 @@ export async function login(email: string, password: string, recaptchaToken?: st
 
   if (!resp.ok) {
     const status = resp.status;
-    const base = data?.message || resp.statusText || "Sai email hoặc mật khẩu";
-    throw new Error(`HTTP ${status}: ${base}`);
+    let errorMessage = data?.message || resp.statusText || "Sai email hoặc mật khẩu";
+    
+    // Specific error messages based on status
+    switch (status) {
+      case 400:
+        errorMessage = "Dữ liệu đăng nhập không hợp lệ";
+        break;
+      case 401:
+        errorMessage = "Email hoặc mật khẩu không đúng";
+        break;
+      case 403:
+        errorMessage = "Tài khoản bị khóa hoặc chưa được xác thực";
+        break;
+      case 429:
+        errorMessage = "Quá nhiều lần thử đăng nhập. Vui lòng thử lại sau";
+        break;
+      case 500:
+        errorMessage = "Lỗi hệ thống. Vui lòng thử lại sau";
+        break;
+    }
+    
+    throw new Error(`HTTP ${status}: ${errorMessage}`);
   }
 
   if (typeof data?.accessToken !== "string" || !data.accessToken) {
@@ -553,6 +597,36 @@ export async function staffLogin(email: string, password: string): Promise<Staff
   localStorage.setItem("staff_token", result.accessToken);
   localStorage.setItem("staff_user", JSON.stringify(result));
   return result;
+}
+
+// Test function để kiểm tra API login
+export async function testLoginAPI(): Promise<{ success: boolean; message: string; data?: any }> {
+  try {
+    const testPayload = {
+      email: "test@example.com",
+      password: "testpassword",
+      recaptchaToken: "test-token"
+    };
+
+    const resp = await fetch(PROFILE_ENDPOINTS.login, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(testPayload),
+    });
+
+    const data = await resp.json().catch(() => ({}));
+
+    return {
+      success: resp.ok,
+      message: resp.ok ? "API endpoint hoạt động" : `HTTP ${resp.status}: ${data?.message || resp.statusText}`,
+      data: resp.ok ? data : undefined
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Lỗi kết nối: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
 }
 
 // Staff logout: clear only staff-related storage

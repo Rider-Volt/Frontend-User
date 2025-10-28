@@ -44,8 +44,8 @@ export interface PayOSPaymentLinkResponse {
 }
 
 const DEFAULT_BANK_CODE = "970422"; // MB Bank
-const DEFAULT_ACCOUNT_NUMBER = "1234567899999";
-const DEFAULT_ACCOUNT_NAME = "EV RENTAL DEMO";
+const DEFAULT_ACCOUNT_NUMBER = "0867976303";
+const DEFAULT_ACCOUNT_NAME = "NGUYEN MINH HUNG";
 const DEFAULT_BANK_NAME = "Ngân hàng TMCP Quân đội (MB)";
 const PAYOS_BASE = `${API_BASE}/payments`;
 
@@ -170,6 +170,6 @@ export async function createDemoPaymentInfo(
     accountName,
     accountNumber,
     qrImageUrl: qrUrl,
-    note: "Demo thanh toán: thao tác chuyển khoản giả lập, không thực hiện giao dịch thực tế.",
+    note: "Scan QR code hoặc chuyển khoản vào tài khoản trên để thanh toán. Sau khi chuyển khoản, nhân viên sẽ xác nhận và cập nhật trạng thái.",
   };
 }

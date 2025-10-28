@@ -2,6 +2,47 @@
 
 const BASE = `${API_BASE}/renter/billings`;
 
+// Retry mechanism cho các API calls quan trọng
+async function fetchWithRetry(
+  url: string, 
+  options: RequestInit, 
+  maxRetries: number = 3
+): Promise<Response> {
+  let lastError: Error | null = null;
+  let lastResponse: Response | null = null;
+  
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const response = await fetch(url, options);
+      lastResponse = response;
+      
+      if (response.ok) return response;
+      
+      // Retry cho server errors (5xx) hoặc network errors
+      if (response.status >= 500 || response.status === 0) {
+        lastError = new Error(`HTTP ${response.status}: ${response.statusText}`);
+        if (i < maxRetries - 1) {
+          console.warn(`API request failed (attempt ${i + 1}/${maxRetries}), retrying...`);
+          await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1))); // Exponential backoff
+          continue;
+        }
+      }
+      
+      return response; // Return response for client errors (4xx)
+    } catch (error) {
+      lastError = error as Error;
+      if (i < maxRetries - 1) {
+        console.warn(`Network error (attempt ${i + 1}/${maxRetries}), retrying...`);
+        await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+      }
+    }
+  }
+  
+  // Return the last response if we got one, otherwise throw
+  if (lastResponse) return lastResponse;
+  throw lastError || new Error('Request failed after retries');
+}
+
 function requireToken(): string {
   const token = getAuthToken();
   if (!token) {
@@ -20,8 +61,8 @@ export type BillingStatus =
 export interface CreateBillingRequest {
   stationId: number;
   modelId: number;
-  startDay: string;
-  endDay: string;
+  plannedStartDate: string; // yyyy-MM-dd
+  plannedEndDate: string;   // yyyy-MM-dd
 }
 
 export interface RenterBillingResponse {
@@ -61,15 +102,42 @@ export async function createBilling(
 }
 
 export async function listMyBillings(
-  status?: BillingStatus
+  status?: BillingStatus,
+  options?: { 
+    includeHistory?: boolean;
+    limit?: number;
+    offset?: number;
+  }
 ): Promise<RenterBillingResponse[]> {
   const token = requireToken();
-  const url = status ? `${BASE}?status=${encodeURIComponent(status)}` : BASE;
-  const resp = await fetch(url, {
+  const params = new URLSearchParams();
+  
+  if (status) params.append('status', status);
+  if (options?.includeHistory) params.append('includeHistory', 'true');
+  if (options?.limit) params.append('limit', options.limit.toString());
+  if (options?.offset) params.append('offset', options.offset.toString());
+  
+  const url = params.toString() ? `${BASE}?${params}` : BASE;
+  const resp = await fetchWithRetry(url, {
     headers: authHeaders(token),
   });
   const data = await resp.json().catch(() => []);
-  if (!resp.ok) throw new Error(data?.message || resp.statusText);
+  
+  if (!resp.ok) {
+    // Graceful handling for 500 errors - return empty array instead of throwing
+    if (resp.status === 500) {
+      console.warn('Backend returned 500 error, returning empty array');
+      return [];
+    }
+    
+    // Handle auth errors
+    if (resp.status === 401 || resp.status === 403) {
+      throw new Error("Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.");
+    }
+    
+    throw new Error(data?.message || resp.statusText);
+  }
+  
   return data as RenterBillingResponse[];
 }
 
@@ -140,14 +208,22 @@ export async function requestCheckOut(
   return data as RenterBillingResponse;
 }
 
-export async function getCheckInQrPayload(
+export async function cancelBilling(
   id: number
-): Promise<{ qrPayload: { type: string; billingId: number } }> {
+): Promise<RenterBillingResponse> {
   const token = requireToken();
-  const resp = await fetch(`${BASE}/${id}/check-in/qr`, {
+  const resp = await fetch(`${BASE}/${id}/cancel`, {
+    method: "POST",
     headers: authHeaders(token),
   });
   const data = await resp.json().catch(() => ({}));
-  if (!resp.ok) throw new Error(data?.message || resp.statusText);
-  return data as { qrPayload: { type: string; billingId: number } };
+  if (!resp.ok) {
+    const msg =
+      data?.message ||
+      (resp.status === 409
+        ? "Không thể hủy hóa đơn ở trạng thái hiện tại"
+        : resp.statusText);
+    throw new Error(`HTTP ${resp.status}: ${msg}`);
+  }
+  return data as RenterBillingResponse;
 }

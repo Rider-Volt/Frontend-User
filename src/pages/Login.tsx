@@ -27,6 +27,19 @@ const Login = () => {
     setError("");
 
     try {
+      // Validation
+      if (!username.trim()) {
+        setError("Vui lòng nhập tên đăng nhập");
+        setIsLoading(false);
+        return;
+      }
+      
+      if (!password.trim()) {
+        setError("Vui lòng nhập mật khẩu");
+        setIsLoading(false);
+        return;
+      }
+
       const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY as string | undefined;
       const canSkipCaptcha = (import.meta as any).env?.DEV && !siteKey;
       if (!recaptchaToken && !canSkipCaptcha) {
@@ -44,7 +57,7 @@ const Login = () => {
 
       navigate("/");
     } catch (error: any) {
-      setError(error?.message || "Sai tên đăng nhập hoặc mật khẩu");
+      setError(error?.message || "Sai email hoặc mật khẩu");
     } finally {
       setIsLoading(false);
     }
@@ -61,26 +74,26 @@ const Login = () => {
         <div className="absolute bottom-20 right-20 w-28 h-28 bg-emerald-500/25 rounded-full blur-xl"></div>
         
         <div className="relative z-10 flex items-center justify-center h-full p-8">
-          <div className="w-full max-w-md">
+          <div className="w-full max-w-xl">
             {/* Logo và tên hệ thống */}
-            <div className="flex items-center gap-3 mb-8">
-              <div className="w-12 h-12 bg-emerald-500 rounded-xl flex items-center justify-center">
-                <Car className="w-6 h-6 text-white" />
+            <div className="flex items-center gap-4 mb-12">
+              <div className="w-16 h-16 bg-emerald-500 rounded-xl flex items-center justify-center">
+                <Car className="w-8 h-8 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-white">EV Station</h1>
-                <p className="text-emerald-400 text-sm">Management System</p>
+                <h1 className="text-4xl font-bold text-white">EV Station</h1>
+                <p className="text-emerald-400 text-lg">Management System</p>
               </div>
             </div>
 
             {/* Form đăng nhập */}
-            <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-8 border border-slate-700/50">
-              <div className="mb-8">
-                <h2 className="text-2xl font-bold text-white mb-2">Đăng nhập</h2>
-                <p className="text-slate-400 text-sm">Nhân viên, Quản lý EV Station</p>
+            <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-12 border border-slate-700/50 w-[600px] aspect-square">
+              <div className="mb-10">
+                <h2 className="text-3xl font-bold text-white mb-3">Đăng nhập</h2>
+                <p className="text-slate-400 text-base">Nhân viên & Quản lý EV Station</p>
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-6">
+              <form onSubmit={handleSubmit} className="space-y-8">
                 {error && (
                   <Alert variant="destructive" className="bg-red-500/10 border-red-500/20">
                     <AlertDescription className="text-red-300">{error}</AlertDescription>
@@ -101,7 +114,7 @@ const Login = () => {
                         onChange={(e) => setUsername(e.target.value)}
                         placeholder="Nhập tên đăng nhập"
                         disabled={isLoading}
-                        className="pl-10 bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-400 focus:border-emerald-500 focus:ring-emerald-500/20"
+                        className="pl-12 h-14 bg-slate-700/50 border-slate-600 text-white text-lg placeholder:text-slate-400 focus:border-emerald-500 focus:ring-emerald-500/20"
                       />
                     </div>
                   </div>
@@ -119,7 +132,7 @@ const Login = () => {
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder="Nhập mật khẩu"
                         disabled={isLoading}
-                        className="pl-10 pr-10 bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-400 focus:border-emerald-500 focus:ring-emerald-500/20"
+                        className="pl-12 pr-12 h-14 bg-slate-700/50 border-slate-600 text-white text-lg placeholder:text-slate-400 focus:border-emerald-500 focus:ring-emerald-500/20"
                       />
                       <button
                         type="button"

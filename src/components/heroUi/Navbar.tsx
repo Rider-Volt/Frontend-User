@@ -95,9 +95,7 @@ const Navbar: React.FC<NavbarProps> = ({ isLoggedIn, username }) => {
           <Link to="/search" className="text-foreground hover:text-primary font-medium">
             Tìm xe
           </Link>
-          <Link to="/Stations" className="text-foreground hover:text-primary font-medium">
-            Điểm thuê
-          </Link>
+          
           
         </nav>
 

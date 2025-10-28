@@ -28,13 +28,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import {
-  BookingStatus,
+  BookingStatuses,
   getBookingHistory,
   saveBookingHistory,
   StoredBooking,
 } from "@/services/bookingService";
 import { getCurrentUser } from "@/services/authService";
-import { listMyBillings } from "@/services/renterBillingService";
+import { listMyBillings, type BillingStatus, cancelBilling, getBillingDetail } from "@/services/renterBillingService";
 import {
   createPayOSPaymentLink,
   extractCheckoutUrl,
@@ -42,11 +42,12 @@ import {
   mockMarkPaymentAsPaid,
   type PayOSPaymentLinkResponse,
   createDemoPaymentInfo,
+  type DemoPaymentInfo,
 } from "@/services/paymentService";
 
 type ToastFn = ReturnType<typeof useToast>["toast"];
 
-const statusColor = (status: BookingStatus) => {
+const statusColor = (status: BillingStatus) => {
   switch (status) {
     case "WAITING":
       return "bg-amber-100 text-amber-800";
@@ -63,7 +64,7 @@ const statusColor = (status: BookingStatus) => {
   }
 };
 
-const statusText = (status: BookingStatus) => {
+const statusText = (status: BillingStatus) => {
   switch (status) {
     case "WAITING":
       return "Chờ thanh toán";
@@ -157,9 +158,6 @@ const mergeBookings = (
     };
 
     if (localEntry) {
-      if (localEntry.deposit != null && merged.deposit == null) {
-        merged.deposit = localEntry.deposit;
-      }
       if (localEntry.totalCharge != null && merged.totalCharge == null) {
         merged.totalCharge = localEntry.totalCharge;
       }
@@ -228,7 +226,7 @@ const PaymentDialog = ({
     | null
     | {
         bookingId: number;
-        payload: PayOSPaymentLinkResponse;
+        payload: PayOSPaymentLinkResponse | DemoPaymentInfo;
         checkoutUrl?: string;
         qrUrl?: string;
       };
@@ -238,11 +236,23 @@ const PaymentDialog = ({
 }) => {
   if (!state) return null;
   const { bookingId, payload, checkoutUrl, qrUrl } = state;
+  
+  // Check if this is DemoPaymentInfo (VietQR) or PayOSPaymentLinkResponse
+  const isVietQR = 'bankName' in payload && 'accountName' in payload && 'accountNumber' in payload;
+  
   const amountLabel =
     typeof payload.amount === "number"
       ? formatCurrency(payload.amount)
       : undefined;
-  const expiryLabel = formatEpochSeconds(payload.expiredAt);
+  const expiryLabel = 'expiredAt' in payload ? formatEpochSeconds(payload.expiredAt) : "—";
+  
+  // Get VietQR bank info if available
+  const bankInfo = isVietQR ? {
+    bankName: (payload as DemoPaymentInfo).bankName,
+    accountName: (payload as DemoPaymentInfo).accountName,
+    accountNumber: (payload as DemoPaymentInfo).accountNumber,
+    note: (payload as DemoPaymentInfo).note
+  } : null;
 
 const handleCopyLink = async () => {
   if (!checkoutUrl) return;
@@ -264,36 +274,66 @@ const handleCopyLink = async () => {
 
   return (
     <Dialog open={!!state} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-xl">
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Thanh toán PayOS cho hóa đơn #{bookingId}</DialogTitle>
+          <DialogTitle>
+            {isVietQR ? `Thanh toán VietQR cho hóa đơn #${bookingId}` : `Thanh toán PayOS cho hóa đơn #${bookingId}`}
+          </DialogTitle>
           <DialogDescription>
-            Hoàn tất thanh toán bằng một trong các tùy chọn bên dưới. Sau khi hệ
-            thống PayOS ghi nhận giao dịch, nhân viên sẽ phê duyệt để bạn tiếp
-            tục quy trình thuê xe.
+            {isVietQR 
+              ? "Chuyển khoản vào tài khoản bên dưới hoặc scan QR code. Sau khi chuyển khoản thành công, nhân viên sẽ xác nhận và cập nhật trạng thái."
+              : "Hoàn tất thanh toán bằng một trong các tùy chọn bên dưới. Sau khi hệ thống PayOS ghi nhận giao dịch, nhân viên sẽ phê duyệt để bạn tiếp tục quy trình thuê xe."
+            }
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <InfoRow
               icon={FileText}
-              label="Mã thanh toán"
-              value={payload.paymentLinkId || `Billing #${bookingId}`}
+              label="Mã hóa đơn"
+              value={isVietQR ? `#${bookingId}` : (payload.paymentLinkId || `Billing #${bookingId}`)}
             />
             <InfoRow
               icon={CreditCard}
               label="Số tiền"
-              value={amountLabel || "—"}
+              value={isVietQR && 'amountLabel' in payload ? String(payload.amountLabel) : (amountLabel || "—")}
             />
-            <InfoRow icon={Calendar} label="Hết hạn" value={expiryLabel} />
-            {payload.status && (
-              <InfoRow
-                icon={CreditCard}
-                label="Trạng thái"
-                value={payload.status}
-              />
+            {!isVietQR && (
+              <>
+                <InfoRow icon={Calendar} label="Hết hạn" value={expiryLabel} />
+                {'status' in payload && payload.status && (
+                  <InfoRow
+                    icon={CreditCard}
+                    label="Trạng thái"
+                    value={payload.status}
+                  />
+                )}
+              </>
             )}
           </div>
+          
+          {isVietQR && bankInfo && (
+            <div className="rounded-lg border bg-muted/50 p-4">
+              <h4 className="mb-3 font-semibold">Thông tin ngân hàng nhận thanh toán</h4>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <InfoRow
+                  icon={CreditCard}
+                  label="Ngân hàng"
+                  value={String(bankInfo.bankName)}
+                />
+                <InfoRow
+                  icon={User}
+                  label="Chủ tài khoản"
+                  value={String(bankInfo.accountName)}
+                />
+                <InfoRow
+                  icon={CreditCard}
+                  label="Số tài khoản"
+                  value={String(bankInfo.accountNumber)}
+                />
+              </div>
+            </div>
+          )}
 
           {(checkoutUrl || qrUrl) && (
             <div className="flex flex-col gap-3 sm:flex-row">
@@ -329,18 +369,31 @@ const handleCopyLink = async () => {
           )}
 
           {qrUrl && (
-            <img
-              src={qrUrl}
-              alt="QR PayOS"
-              className="mx-auto h-48 w-48 rounded-md border bg-white p-3 shadow-sm"
-            />
+            <div className="space-y-2">
+              <img
+                src={qrUrl}
+                alt="QR Code thanh toán"
+                className="mx-auto h-64 w-64 rounded-md border bg-white p-3 shadow-sm"
+              />
+              <p className="text-center text-sm text-muted-foreground">
+                Scan QR code bằng ứng dụng ngân hàng để chuyển khoản
+              </p>
+            </div>
           )}
 
-          <p className="text-xs text-muted-foreground">
-            Lưu ý: Thanh toán thành công không tự động chuyển sang &quot;Đã thanh
-            toán&quot;. Nhân viên sẽ kiểm tra và xác nhận trước khi bạn có thể
-            tiếp tục.
-          </p>
+          {bankInfo && bankInfo.note && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+              <p className="text-sm text-amber-900">{String(bankInfo.note)}</p>
+            </div>
+          )}
+
+          {!isVietQR && (
+            <p className="text-xs text-muted-foreground">
+              Lưu ý: Thanh toán thành công không tự động chuyển sang &quot;Đã thanh
+              toán&quot;. Nhân viên sẽ kiểm tra và xác nhận trước khi bạn có thể
+              tiếp tục.
+            </p>
+          )}
         </div>
   <DialogFooter>
     <Button variant="secondary" onClick={onClose}>
@@ -351,7 +404,7 @@ const handleCopyLink = async () => {
       disabled={!onSuccess}
       className="bg-emerald-600 hover:bg-emerald-700 text-white"
     >
-      Thanh toán demo (đánh dấu thành công)
+      {isVietQR ? "Đã chuyển khoản (xác nhận)" : "Thanh toán demo (đánh dấu thành công)"}
     </Button>
   </DialogFooter>
 </DialogContent>
@@ -368,11 +421,12 @@ const Bookings = () => {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [payingId, setPayingId] = useState<number | null>(null);
+  const [lastRefreshTime, setLastRefreshTime] = useState<number>(0);
   const [paymentDialog, setPaymentDialog] = useState<
     | null
     | {
         bookingId: number;
-        payload: PayOSPaymentLinkResponse;
+        payload: PayOSPaymentLinkResponse | DemoPaymentInfo;
         checkoutUrl?: string;
         qrUrl?: string;
       }
@@ -382,21 +436,23 @@ const Bookings = () => {
   const { toast } = useToast();
 
   const loadBookings = useCallback(
-    async (userId: number, options?: { silent?: boolean }) => {
+    async (userId: number, options?: { silent?: boolean; forceRefresh?: boolean }) => {
       const localHistory = getBookingHistory(userId);
       if (!options?.silent) {
         setBookings(localHistory);
       }
 
       try {
+        // Force refresh từ backend nếu được yêu cầu
         const remoteList = await listMyBillings();
         const normalizedRemote = remoteList.map((entry) => ({
           ...entry,
-          bookingId: entry.id ?? entry.bookingId,
+          bookingId: entry.id,
         })) as StoredBooking[];
         const merged = mergeBookings(normalizedRemote, localHistory);
         setBookings(merged);
         saveBookingHistory(userId, merged);
+        setLastRefreshTime(Date.now());
         setError(null);
         return true;
       } catch (err) {
@@ -404,6 +460,13 @@ const Bookings = () => {
           err instanceof Error
             ? err.message
             : "Không tải được danh sách hóa đơn";
+        
+        // Don't show error if it's a server error (500) - just return empty
+        if (message.includes("500") || message.includes("Lỗi hệ thống")) {
+          setError(null);
+          return true; // Return true with empty bookings
+        }
+        
         setError(message);
         if (!options?.silent) {
           toast({
@@ -448,6 +511,17 @@ const Bookings = () => {
     })();
   }, [loadBookings]);
 
+  // Auto-refresh mỗi 30 giây để cập nhật trạng thái từ staff
+  useEffect(() => {
+    if (!currentUserId) return;
+    
+    const interval = setInterval(() => {
+      loadBookings(currentUserId, { silent: true });
+    }, 30000); // 30 giây
+
+    return () => clearInterval(interval);
+  }, [currentUserId, loadBookings]);
+
   const waitingBookings = useMemo(
     () => bookings.filter((booking) => booking.status === "WAITING"),
     [bookings]
@@ -472,12 +546,36 @@ const Bookings = () => {
   const handleRefresh = async () => {
     if (!currentUserId) return;
     setRefreshing(true);
-    const ok = await loadBookings(currentUserId, { silent: true });
+    
+    // Clear cache để force refresh từ backend
+    if (currentUserId) {
+      localStorage.removeItem(`booking_history_${currentUserId}`);
+    }
+    
+    const ok = await loadBookings(currentUserId, { silent: true, forceRefresh: true });
     setRefreshing(false);
     if (ok) {
       toast({
         title: "Đã cập nhật danh sách hóa đơn",
+        description: "Trạng thái từ staff đã được đồng bộ",
       });
+    }
+  };
+
+  const refreshSingleBooking = async (billingId: number) => {
+    try {
+      const updatedBilling = await getBillingDetail(billingId);
+      setBookings(prevBookings => 
+        prevBookings.map(booking => 
+          booking.id === billingId || booking.bookingId === billingId
+            ? { ...booking, ...updatedBilling, bookingId: updatedBilling.id }
+            : booking
+        )
+      );
+      return true;
+    } catch (err) {
+      console.error("Failed to refresh single booking:", err);
+      return false;
     }
   };
 
@@ -533,10 +631,10 @@ const Bookings = () => {
   ) => {
     if (loading) {
       return (
-        <Card>
-          <CardContent className="flex items-center justify-center gap-2 py-10 text-muted-foreground">
-            <Loader2 className="h-5 w-5 animate-spin" />
-            <span>Đang tải dữ liệu...</span>
+        <Card className="border-gray-200 shadow-sm">
+          <CardContent className="flex items-center justify-center gap-3 py-16 bg-white">
+            <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+            <span className="text-gray-600 font-medium">Đang tải dữ liệu...</span>
           </CardContent>
         </Card>
       );
@@ -544,11 +642,13 @@ const Bookings = () => {
 
     if (items.length === 0) {
       return (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <Car className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-            <h3 className="mb-2 text-lg font-semibold">{emptyTitle}</h3>
-            <p className="text-muted-foreground">{emptyDesc}</p>
+        <Card className="border-gray-200 shadow-sm bg-gradient-to-br from-white to-gray-50">
+          <CardContent className="py-16 text-center">
+            <div className="mx-auto mb-6 w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center">
+              <Car className="h-10 w-10 text-emerald-600" />
+            </div>
+            <h3 className="mb-3 text-xl font-bold text-gray-900">{emptyTitle}</h3>
+            <p className="text-gray-600 max-w-md mx-auto">{emptyDesc}</p>
           </CardContent>
         </Card>
       );
@@ -572,87 +672,112 @@ const Bookings = () => {
       const allowPay = booking.status === "WAITING";
 
       return (
-        <Card key={id ?? `local-${index}`}>
-          <CardHeader className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <CardTitle className="text-xl">{vehicleName}</CardTitle>
-              <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <FileText className="h-4 w-4" />
-                  {id ? `Mã hóa đơn #${id}` : "Chưa có mã hóa đơn"}
-                </span>
-                {booking.renterName && (
-                  <span className="flex items-center gap-1">
-                    <User className="h-4 w-4" />
-                    {booking.renterName}
-                  </span>
-                )}
+        <Card key={id ?? `local-${index}`} className="overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+          <CardHeader className="bg-gradient-to-r from-emerald-50 to-white pb-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div className="flex-1">
+                <div className="flex items-start gap-3">
+                  <div className="lg:w-32 lg:h-24 w-24 h-20 rounded-lg overflow-hidden border border-gray-200 shadow-sm flex-shrink-0">
+                    <img
+                      src={booking.localVehicleImage || fallbackImage}
+                      alt={vehicleName}
+                      className="h-full w-full object-cover"
+                      onError={(event) => {
+                        (event.target as HTMLImageElement).src = fallbackImage;
+                      }}
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <CardTitle className="text-xl font-bold text-gray-900 mb-2 line-clamp-2">
+                      {vehicleName}
+                    </CardTitle>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-gray-600">
+                      <span className="flex items-center gap-1.5 font-medium">
+                        <FileText className="h-4 w-4 text-emerald-600" />
+                        {id ? `#${id}` : "Chưa có mã"}
+                      </span>
+                      {booking.renterName && (
+                        <span className="flex items-center gap-1.5">
+                          <User className="h-4 w-4 text-gray-400" />
+                          {booking.renterName}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
+              <Badge className={`${statusColor(booking.status)} shrink-0 font-semibold px-3 py-1.5 text-xs uppercase tracking-wide`}>
+                {statusText(booking.status)}
+              </Badge>
             </div>
-            <Badge className={statusColor(booking.status)}>
-              {statusText(booking.status)}
-            </Badge>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="flex flex-col gap-4 lg:flex-row">
-              <div className="lg:w-40">
-                <img
-                  src={booking.localVehicleImage || fallbackImage}
-                  alt={vehicleName}
-                  className="h-24 w-40 rounded-md border object-cover"
-                  onError={(event) => {
-                    (event.target as HTMLImageElement).src = fallbackImage;
-                  }}
-                />
+          
+          <CardContent className="p-6 space-y-5 bg-white">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-100">
+                <div className="flex items-start gap-3">
+                  <Calendar className="h-5 w-5 flex-shrink-0 text-emerald-600 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                      NGÀY THUÊ
+                    </p>
+                    <p className="text-sm font-semibold text-gray-900 break-words">
+                      {start !== "—" && end !== "—" ? `${start} → ${end}` : "Chưa xác định"}
+                    </p>
+                  </div>
+                </div>
               </div>
-              <div className="grid flex-1 gap-4 sm:grid-cols-2">
-                <InfoRow icon={Calendar} label="Ngày thuê" value={`${start} → ${end}`} />
-                <InfoRow
-                  icon={Clock}
-                  label="Thời gian đặt"
-                  value={bookingTime}
-                />
-                <InfoRow
-                  icon={CreditCard}
-                  label="Tổng tiền"
-                  value={formatCurrency(total)}
-                />
-                {/* Đã xóa hiển thị tiền cọc */}
+              
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-100">
+                <div className="flex items-start gap-3">
+                  <CreditCard className="h-5 w-5 flex-shrink-0 text-emerald-600 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                      TỔNG TIỀN
+                    </p>
+                    <p className="text-lg font-bold text-emerald-600">
+                      {formatCurrency(total)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-100">
+                <div className="flex items-start gap-3">
+                  <Clock className="h-5 w-5 flex-shrink-0 text-emerald-600 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                      THỜI GIAN ĐẶT
+                    </p>
+                    <p className="text-sm font-semibold text-gray-900 break-words">
+                      {bookingTime}
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <InfoRow
-                icon={Car}
-                label="Trạng thái"
-                value={statusText(booking.status)}
-              />
-              <InfoRow
-                icon={CreditCard}
-                label="Phương thức thanh toán"
-                value={paymentMethodText(booking.paymentMethod)}
-              />
-              {booking.pickupLocation && (
-                <InfoRow
-                  icon={MapPin}
-                  label="Điểm nhận xe"
-                  value={booking.pickupLocation}
-                />
-              )}
-              {typeof hours === "number" && hours > 0 && (
-                <InfoRow
-                  icon={Clock}
-                  label="Thời lượng ước tính"
-                  value={`${hours} giờ`}
-                />
-              )}
-            </div>
+            {booking.pickupLocation && (
+              <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
+                <div className="flex items-start gap-3">
+                  <MapPin className="h-5 w-5 flex-shrink-0 text-blue-600 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-blue-600 mb-1">
+                      ĐIỂM NHẬN XE
+                    </p>
+                    <p className="text-sm font-medium text-gray-900 break-words">
+                      {booking.pickupLocation}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {allowPay && (
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-3 pt-2">
                 <Button
                   onClick={async () => {
-                    // Mock mode: chỉ hiển thị popup QR demo, không gọi API thật
+                    // VietQR payment with real bank account
                     const info = await createDemoPaymentInfo({
                       billingId: booking.bookingId,
                       amount: booking.totalCharge || 10000,
@@ -664,33 +789,24 @@ const Bookings = () => {
                       qrUrl: info.qrImageUrl,
                     });
                   }}
-                  className="bg-emerald-600 hover:bg-emerald-700"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-6 shadow-sm"
                 >
-                  Thanh toán PayOS (Mock)
+                  Thanh toán VietQR
                 </Button>
                 <Button
                   variant="destructive"
                   onClick={async () => {
                     try {
-                      // Call backend API to cancel booking
                       const billingId = booking.id ?? booking.bookingId;
                       if (!billingId) throw new Error("Không tìm thấy mã hóa đơn");
-                      // Truyền Authorization header để backend xác thực
-                      const { getAuthToken, authHeaders } = await import("@/services/authService");
-                      const token = getAuthToken();
-                      const resp = await fetch(`/api/renter/billings/${billingId}/cancel`, {
-                        method: "POST",
-                        headers: authHeaders(token),
-                      });
-                      if (!resp.ok) {
-                        const data = await resp.json().catch(() => ({}));
-                        throw new Error(data?.message || resp.statusText);
-                      }
+                      
+                      await cancelBilling(billingId);
                       toast({
                         title: "Đã hủy đơn thành công",
                         description: `Hóa đơn #${billingId} đã được hủy.`,
                       });
-                      if (currentUserId) await loadBookings(currentUserId, { silent: true });
+                      // Refresh booking cụ thể thay vì refresh toàn bộ
+                      await refreshSingleBooking(billingId);
                     } catch (err) {
                       toast({
                         title: "Không thể hủy đơn",
@@ -699,10 +815,16 @@ const Bookings = () => {
                       });
                     }
                   }}
+                  className="font-semibold px-6 shadow-sm"
                 >
                   Hủy đơn
                 </Button>
-                <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
+                <Button 
+                  variant="outline" 
+                  onClick={handleRefresh} 
+                  disabled={refreshing}
+                  className="font-semibold px-6 border-gray-300 hover:bg-gray-50"
+                >
                   {refreshing ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -721,95 +843,136 @@ const Bookings = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-secondary/20 to-accent/20">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-emerald-50/30">
       <Navbar isLoggedIn={isLoggedIn} username={username} />
 
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold mb-1">Lịch sử đặt xe</h1>
-            <p className="text-muted-foreground">
-              Quản lý và theo dõi tất cả hóa đơn thuê xe của bạn.
-            </p>
+      <div className="container mx-auto px-4 py-8 max-w-7xl">
+        <div className="mb-8">
+          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between mb-6">
+            <div>
+              <h1 className="text-3xl md:text-4xl font-bold mb-2 text-gray-900">
+                Lịch sử đặt xe
+              </h1>
+              <p className="text-gray-600 text-base">
+                Quản lý và theo dõi tất cả hóa đơn thuê xe của bạn
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="flex items-center gap-2">
+                {error && (
+                  <Badge variant="destructive" className="text-xs px-3 py-1.5">
+                    {error}
+                  </Badge>
+                )}
+                {lastRefreshTime > 0 && (
+                  <Badge variant="outline" className="text-xs px-3 py-1.5 bg-white border-gray-200 text-gray-600">
+                    <Clock className="h-3 w-3 mr-1.5" />
+                    {new Date(lastRefreshTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                  </Badge>
+                )}
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleRefresh} 
+                  disabled={refreshing || loading}
+                  className="bg-white hover:bg-gray-50 border-gray-200 text-gray-700 font-medium"
+                >
+                  {refreshing || loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Đang tải
+                    </>
+                  ) : (
+                    "Làm mới"
+                  )}
+                </Button>
+              </div>
+              <Button 
+                size="sm" 
+                onClick={() => navigate("/")}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-sm"
+              >
+                Đặt xe ngay
+              </Button>
+            </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {error && (
-              <Badge variant="destructive" className="text-sm">
-                {error}
-              </Badge>
-            )}
-            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing || loading}>
-              {refreshing || loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Đang tải
-                </>
-              ) : (
-                "Làm mới"
-              )}
-            </Button>
-            <Button size="sm" onClick={() => navigate("/")}>
-              Đặt xe ngay
-            </Button>
-          </div>
-        </div>
 
-        <Tabs defaultValue="all" className="w-full">
-          <TabsList className="grid w-full grid-cols-6">
-            <TabsTrigger value="all">Tất cả ({bookings.length})</TabsTrigger>
-            <TabsTrigger value="waiting">
-              Chờ thanh toán ({waitingBookings.length})
-            </TabsTrigger>
-            <TabsTrigger value="payed">
-              Đã thanh toán ({payedBookings.length})
-            </TabsTrigger>
-            <TabsTrigger value="renting">
-              Đang thuê ({rentingBookings.length})
-            </TabsTrigger>
-            <TabsTrigger value="done">
-              Hoàn thành ({doneBookings.length})
-            </TabsTrigger>
-            <TabsTrigger value="cancelled">
-              Đã hủy ({cancelledBookings.length})
-            </TabsTrigger>
-          </TabsList>
+          <Tabs defaultValue="all" className="w-full">
+            <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 bg-white border border-gray-200 rounded-lg p-1.5 gap-1 h-auto">
+              <TabsTrigger 
+                value="all" 
+                className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-sm text-xs font-semibold py-2.5 rounded-md transition-all"
+              >
+                Tất cả ({bookings.length})
+              </TabsTrigger>
+              <TabsTrigger 
+                value="waiting"
+                className="data-[state=active]:bg-amber-500 data-[state=active]:text-white data-[state=active]:shadow-sm text-xs font-semibold py-2.5 rounded-md transition-all"
+              >
+                Chờ thanh toán ({waitingBookings.length})
+              </TabsTrigger>
+              <TabsTrigger 
+                value="payed"
+                className="data-[state=active]:bg-blue-500 data-[state=active]:text-white data-[state=active]:shadow-sm text-xs font-semibold py-2.5 rounded-md transition-all"
+              >
+                Đã thanh toán ({payedBookings.length})
+              </TabsTrigger>
+              <TabsTrigger 
+                value="renting"
+                className="data-[state=active]:bg-sky-500 data-[state=active]:text-white data-[state=active]:shadow-sm text-xs font-semibold py-2.5 rounded-md transition-all"
+              >
+                Đang thuê ({rentingBookings.length})
+              </TabsTrigger>
+              <TabsTrigger 
+                value="done"
+                className="data-[state=active]:bg-gray-600 data-[state=active]:text-white data-[state=active]:shadow-sm text-xs font-semibold py-2.5 rounded-md transition-all"
+              >
+                Hoàn thành ({doneBookings.length})
+              </TabsTrigger>
+              <TabsTrigger 
+                value="cancelled"
+                className="data-[state=active]:bg-red-500 data-[state=active]:text-white data-[state=active]:shadow-sm text-xs font-semibold py-2.5 rounded-md transition-all"
+              >
+                Đã hủy ({cancelledBookings.length})
+              </TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="all" className="space-y-4">
+          <TabsContent value="all" className="space-y-5 mt-6">
             {renderList(
               bookings,
               "Chưa có hóa đơn nào",
               "Hãy bắt đầu hành trình với một chiếc xe điện ngay hôm nay!"
             )}
           </TabsContent>
-          <TabsContent value="waiting" className="space-y-4">
+          <TabsContent value="waiting" className="space-y-5 mt-6">
             {renderList(
               waitingBookings,
               "Không có hóa đơn chờ thanh toán",
               "Khi tạo hóa đơn mới, bạn có thể thanh toán PayOS tại đây."
             )}
           </TabsContent>
-          <TabsContent value="payed" className="space-y-4">
+          <TabsContent value="payed" className="space-y-5 mt-6">
             {renderList(
               payedBookings,
               "Chưa có hóa đơn đã thanh toán",
               "Sau khi thanh toán và được nhân viên xác nhận, hóa đơn sẽ xuất hiện tại đây."
             )}
           </TabsContent>
-          <TabsContent value="renting" className="space-y-4">
+          <TabsContent value="renting" className="space-y-5 mt-6">
             {renderList(
               rentingBookings,
               "Không có chuyến đi đang diễn ra",
               "Khi bạn nhận xe, trạng thái sẽ hiển thị tại đây."
             )}
           </TabsContent>
-          <TabsContent value="done" className="space-y-4">
+          <TabsContent value="done" className="space-y-5 mt-6">
             {renderList(
               doneBookings,
               "Chưa có chuyến đi hoàn thành",
               "Hoàn tất một chuyến đi để xem lại chi tiết tại đây."
             )}
           </TabsContent>
-          <TabsContent value="cancelled" className="space-y-4">
+          <TabsContent value="cancelled" className="space-y-5 mt-6">
             {renderList(
               cancelledBookings,
               "Không có hóa đơn bị hủy",
@@ -817,6 +980,7 @@ const Bookings = () => {
             )}
           </TabsContent>
         </Tabs>
+        </div>
 
         <PaymentDialog
           state={paymentDialog}
@@ -846,12 +1010,21 @@ const Bookings = () => {
         />
 
         {!loading && bookings.length === 0 && (
-          <Card className="mt-6">
-            <CardContent className="py-8 text-center">
-              <p className="mb-4 text-muted-foreground">
+          <Card className="mt-6 border-gray-200 shadow-sm bg-gradient-to-br from-white to-gray-50">
+            <CardContent className="py-12 text-center">
+              <div className="mx-auto mb-6 w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center">
+                <Car className="h-10 w-10 text-emerald-600" />
+              </div>
+              <h3 className="mb-3 text-xl font-bold text-gray-900">Chưa có hóa đơn nào</h3>
+              <p className="mb-6 text-gray-600 max-w-md mx-auto">
                 Bạn chưa có hóa đơn nào. Trải nghiệm dịch vụ thuê xe điện ngay!
               </p>
-              <Button onClick={() => navigate("/")}>Đặt xe ngay</Button>
+              <Button 
+                onClick={() => navigate("/")}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-8 shadow-sm"
+              >
+                Đặt xe ngay
+              </Button>
             </CardContent>
           </Card>
         )}

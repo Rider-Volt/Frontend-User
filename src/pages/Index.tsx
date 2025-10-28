@@ -93,18 +93,22 @@ const Index: React.FC = () => {
             <div className="absolute inset-0 bg-black/40" />
           </div>
 
+          {/* Floating Searchbar on top of the image */}
+          <div className="absolute top-6 left-1/2 -translate-x-1/2 z-20 w-full flex justify-center px-4">
+            <SearchBar onSubmit={handleSearchSubmit} />
+          </div>
+
           <div className="relative z-10 container mx-auto px-4 text-center">
-            <h1 className="text-5xl md:text-7xl font-bold mb-6 text-white">
+            <h1 className="text-6xl md:text-8xl font-extrabold leading-tight mb-6 text-white">
               Thuê xe điện{" "}
               <span className="block bg-gradient-to-r from-green-400 to-blue-400 bg-clip-text text-transparent">
                 Tương lai xanh
               </span>
             </h1>
-            <p className="text-xl text-white/90 mb-12 max-w-3xl mx-auto">
+            <p className="text-2xl md:text-3xl text-white/90 mb-12 max-w-4xl mx-auto">
               Trải nghiệm công nghệ xe điện tiên tiến. Thuê xe theo ngày, thuận
               tiện và thân thiện với môi trường.
             </p>
-            <SearchBar onSubmit={handleSearchSubmit} />
           </div>
         </section>
 

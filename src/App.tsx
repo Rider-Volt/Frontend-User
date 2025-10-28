@@ -10,7 +10,7 @@ import VehicleDetailsPage from "./pages/VehicleDetailsPage";
 import Profile from "./pages/Profile";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
-import StationsPage from "./pages/StationsPage";
+// StationsPage removed per request
 import NotFound from "./pages/NotFound";
 import AdminLayout from '@/components/layout/AdminLayout';
 import AdminDashboardPage from './pages/AdminDashboardMenu';
@@ -35,7 +35,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/search" element={<CarSearchPage />} />
-          <Route path="/Stations" element={<StationsPage />} />
+          {/* Stations page removed */}
           <Route path="/Bookings" element={<Bookings />} />
           <Route path="/vehicle/:id" element={<VehicleDetailsPage />} />
           <Route path="/profile" element={<Profile />} />

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,10 +26,14 @@ import {
   AlertCircle,
   CheckCircle,
   CreditCard,
+  Phone,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { differenceInCalendarDays, format, addDays } from "date-fns";
 import { vi } from "date-fns/locale";
 import Navbar from "@/components/heroUi/Navbar";
+import Footer from "@/components/heroUi/Footer";
 import {
   Dialog,
   DialogContent,
@@ -54,6 +58,7 @@ import { getCurrentUser, fetchProfileFromAPI } from "@/services/authService";
 import { VehicleData } from "@/data/vehicles";
 import { fetchVehicleById } from "@/services/vehicleService";
 import { DateTimePicker } from "@/components/ui/date-time-picker";
+import { listStationsBrief, type StationBrief } from "@/services/stationServices";
 
 const VehicleDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -65,13 +70,15 @@ const VehicleDetailsPage = () => {
   const { toast } = useToast();
   const [loadingVehicle, setLoadingVehicle] = useState(true);
   const [vehicleError, setVehicleError] = useState<string | null>(null);
+  const [stations, setStations] = useState<StationBrief[]>([]);
+  const [loadingStations, setLoadingStations] = useState(true);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Booking form state
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
-  const [pickupOption, setPickupOption] = useState("self");
-  const [paymentMethod, setPaymentMethod] = useState("credit-card");
   const [isBooking, setIsBooking] = useState(false);
+  const [actualRentalAmount, setActualRentalAmount] = useState<number | null>(null);
 
   // Modal state
   const [showInsuranceModal, setShowInsuranceModal] = useState(false);
@@ -97,6 +104,38 @@ const VehicleDetailsPage = () => {
       }
     }
   }, []);
+
+  // Fetch all stations
+  useEffect(() => {
+    let cancelled = false;
+    const loadStations = async () => {
+      setLoadingStations(true);
+      try {
+        const data = await listStationsBrief();
+        if (!cancelled) {
+          setStations(data);
+        }
+      } catch (err) {
+        console.error("Error loading stations:", err);
+        if (!cancelled) {
+          setStations([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingStations(false);
+        }
+      }
+    };
+    loadStations();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Reset actual rental amount when dates change
+  useEffect(() => {
+    setActualRentalAmount(null);
+  }, [startDate, endDate]);
 
   useEffect(() => {
     let cancelled = false;
@@ -264,6 +303,7 @@ const InfoRow = ({
         <div className="flex-1 flex items-center justify-center">
           <p>Đang tải thông tin xe…</p>
         </div>
+        <Footer />
       </div>
     );
   }
@@ -280,6 +320,7 @@ const InfoRow = ({
             Quay lại
           </Button>
         </div>
+        <Footer />
       </div>
     );
   }
@@ -394,24 +435,24 @@ const InfoRow = ({
       return;
     }
 
-    const pickupLocation =
-      pickupOption === "self"
-        ? vehicle.fullAddress || vehicle.location
-        : "Giao tận nơi - sẽ liên hệ để xác nhận địa điểm";
-
-    const toInstant = (date: Date) => date.toISOString();
+    // Many BE validators expect date-only strings (yyyy-MM-dd) for booking windows
+    const toDateOnly = (date: Date) => format(date, "yyyy-MM-dd");
     const payload = {
       modelId: vehicle.id,
       stationId: vehicle.stationId || 1,
-      startDay: toInstant(startDate),
-      endDay: toInstant(endDate),
+      plannedStartDate: toDateOnly(startDate),
+      plannedEndDate: toDateOnly(endDate),
     };
 
     setIsBooking(true);
     try {
       const billing = await createBilling(payload);
-      const effectiveRentalAmount = rentalAmount;
-  const totalCharge = effectiveRentalAmount;
+      // Sử dụng giá từ backend nếu có, nếu không thì dùng giá tính toán từ frontend
+      const effectiveRentalAmount = billing.totalCost ?? rentalAmount;
+      const totalCharge = effectiveRentalAmount;
+      
+      // Lưu giá tiền thực tế để hiển thị trong UI
+      setActualRentalAmount(effectiveRentalAmount);
 
       const storedEntry: StoredBooking = {
         ...billing,
@@ -421,51 +462,21 @@ const InfoRow = ({
         totalCharge,
         localVehicleName: vehicle.name,
         localVehicleImage: vehicle.image || vehicle.imageUrl || "",
-        pickupLocation,
-        paymentMethod,
+        // Pickup method/payment method removed from UI; implied defaults
       };
 
       appendBookingHistory(userId, storedEntry);
 
+      // Luôn sử dụng VietQR với thông tin ngân hàng của bạn
       try {
-        const payOSPayload = await createPayOSPaymentLink(billing.id);
-        const checkoutUrl = extractCheckoutUrl(payOSPayload);
-        const qrUrl = extractQrCode(payOSPayload);
-        if (!checkoutUrl && !qrUrl) {
-          throw new Error("Không tìm thấy liên kết PayOS trong phản hồi");
-        }
-        setPayOsPayment({
+        const info = await createDemoPaymentInfo({
           billingId: billing.id,
-          payload: payOSPayload,
-          checkoutUrl,
-          qrUrl,
+          amount: totalCharge,
         });
-        toast({
-          title: "Đặt xe thành công",
-          description:
-            "Liên kết PayOS đã sẵn sàng. Hoàn tất thanh toán trong cửa sổ popup.",
-        });
-        return;
-      } catch (payErr) {
-        console.warn("PayOS payment link fallback to demo:", payErr);
-        try {
-          const info = await createDemoPaymentInfo({
-            billingId: billing.id,
-            amount: totalCharge,
-          });
-          setPaymentInfo(info);
-          toast({
-            title: "Đặt xe thành công",
-            description:
-              "PayOS tạm thời không khả dụng. Vui lòng dùng hướng dẫn chuyển khoản demo bên dưới.",
-          });
-        } catch (demoErr) {
-          toast({
-            title: "Đặt xe thành công",
-            description: `Mã hóa đơn #${billing.id}. Không thể tạo liên kết thanh toán ngay lúc này, vui lòng thanh toán trong mục lịch sử.`,
-          });
-          navigate("/bookings");
-        }
+        setPaymentInfo(info);
+      } catch (demoErr) {
+        
+        navigate("/bookings");
       }
     } catch (error) {
       const message =
@@ -484,11 +495,14 @@ const InfoRow = ({
 
   if (!vehicle) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Không tìm thấy xe</h1>
-          <Button onClick={() => navigate("/")}>Quay về trang chủ</Button>
+      <div className="min-h-screen bg-white flex flex-col">
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold mb-4">Không tìm thấy xe</h1>
+            <Button onClick={() => navigate("/")}>Quay về trang chủ</Button>
+          </div>
         </div>
+        <Footer />
       </div>
     );
   }
@@ -511,10 +525,10 @@ const InfoRow = ({
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="container mx-auto px-4 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
           {/* Left Column - Vehicle Details */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-8">
             {/* Vehicle Title and Badge */}
             <div className="flex items-center justify-between">
               <div>
@@ -558,47 +572,55 @@ const InfoRow = ({
             </div>
 
             {/* Features */}
-            <div>
-              <h2 className="text-xl font-semibold mb-4 border-b-2 border-green-500 pb-2 inline-block">
-                Đặc điểm
+            <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+              <h2 className="text-xl font-semibold mb-6 text-gray-900">
+                <span className="border-b-2 border-green-500 pb-2">Đặc điểm</span>
               </h2>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex items-center gap-3">
-                  <Users className="w-5 h-5 text-blue-500" />
+              <div className="grid grid-cols-2 gap-6">
+                <div className="flex items-center gap-4 p-4 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
+                  <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <Users className="w-6 h-6 text-blue-600" />
+                  </div>
                   <div>
-                    <span className="text-sm text-muted-foreground">
+                    <span className="text-sm text-gray-500 font-medium">
                       Số ghế
                     </span>
-                    <p className="font-medium">{vehicle.features?.seats} chỗ</p>
+                    <p className="font-semibold text-gray-900">{vehicle.features?.seats} chỗ</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <Settings className="w-5 h-5 text-blue-500" />
+                <div className="flex items-center gap-4 p-4 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
+                  <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <Settings className="w-6 h-6 text-blue-600" />
+                  </div>
                   <div>
-                    <span className="text-sm text-muted-foreground">
+                    <span className="text-sm text-gray-500 font-medium">
                       Truyền động
                     </span>
-                    <p className="font-medium">
+                    <p className="font-semibold text-gray-900">
                       {vehicle.features?.transmission}
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <Battery className="w-5 h-5 text-blue-500" />
+                <div className="flex items-center gap-4 p-4 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
+                  <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                    <Battery className="w-6 h-6 text-green-600" />
+                  </div>
                   <div>
-                    <span className="text-sm text-muted-foreground">
+                    <span className="text-sm text-gray-500 font-medium">
                       Nhiên liệu
                     </span>
-                    <p className="font-medium">{vehicle.features?.fuel}</p>
+                    <p className="font-semibold text-gray-900">{vehicle.features?.fuel}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <Leaf className="w-5 h-5 text-blue-500" />
+                <div className="flex items-center gap-4 p-4 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
+                  <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                    <Leaf className="w-6 h-6 text-green-600" />
+                  </div>
                   <div>
-                    <span className="text-sm text-muted-foreground">
+                    <span className="text-sm text-gray-500 font-medium">
                       Tiêu hao
                     </span>
-                    <p className="font-medium">
+                    <p className="font-semibold text-gray-900">
                       {vehicle.features?.consumption}
                     </p>
                   </div>
@@ -607,45 +629,132 @@ const InfoRow = ({
             </div>
 
             {/* Description */}
-            <div>
-              <h2 className="text-xl font-semibold mb-4 border-b-2 border-green-500 pb-2 inline-block">
-                Mô tả
+            <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+              <h2 className="text-xl font-semibold mb-6 text-gray-900">
+                <span className="border-b-2 border-green-500 pb-2">Mô tả</span>
               </h2>
-              <p className="text-muted-foreground leading-relaxed">
-                {vehicle.description}
+              <p className="text-gray-600 leading-relaxed">
+                {vehicle.description || "Thông tin mô tả chi tiết về xe sẽ được cập nhật sớm nhất."}
               </p>
             </div>
 
             {/* Location */}
-            <div>
-              <h2 className="text-xl font-semibold mb-4 border-b-2 border-green-500 pb-2 inline-block">
-                Vị trí xe
+            <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+              <h2 className="text-xl font-semibold mb-6 text-gray-900">
+                <span className="border-b-2 border-green-500 pb-2">Vị trí xe</span>
               </h2>
-              <div className="flex items-start gap-3">
-                <MapPin className="w-5 h-5 text-blue-500 mt-1" />
-                <div>
-                  <p className="font-medium">{vehicle.fullAddress}</p>
+
+              {loadingStations ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="flex items-center gap-3">
+                    <div className="w-6 h-6 border-2 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+                    <p className="text-gray-500">Đang tải danh sách trạm...</p>
+                  </div>
                 </div>
-              </div>
+              ) : stations.length > 0 ? (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <MapPin className="w-5 h-5 text-green-600" />
+                    <p className="text-sm text-gray-600">
+                      Có <span className="font-semibold text-green-600">{stations.length}</span> trạm cho thuê
+                    </p>
+                  </div>
+                  
+                  <div className="relative">
+                    <div
+                      ref={scrollContainerRef}
+                      className="flex gap-4 overflow-x-auto scroll-smooth scrollbar-hide pb-4"
+                      style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                    >
+                      {stations.map((station) => (
+                        <div
+                          key={station.id}
+                          className="flex-shrink-0 w-[320px] p-5 rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 hover:shadow-md transition-all duration-200"
+                        >
+                          <div className="flex items-start gap-3 mb-3">
+                            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                              <MapPin className="w-5 h-5 text-green-600" />
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-sm font-semibold text-gray-900 mb-1">{station.name}</p>
+                              <p className="text-sm text-gray-600 leading-relaxed">{station.address}</p>
+                            </div>
+                          </div>
+                          
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full h-9 text-sm border-gray-300 text-gray-700 hover:bg-green-50 hover:border-green-300 hover:text-green-700 transition-colors"
+                            onClick={() => {
+                              const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(station.address)}`;
+                              window.open(mapUrl, '_blank');
+                            }}
+                          >
+                            <MapPin className="w-4 h-4 mr-2" />
+                            Xem bản đồ
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    {/* Scroll buttons */}
+                    {stations.length > 1 && (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="absolute left-0 top-1/2 -translate-y-1/2 bg-white shadow-lg hover:bg-gray-50 z-10 h-10 w-10 border-gray-300"
+                          onClick={() => {
+                            if (scrollContainerRef.current) {
+                              scrollContainerRef.current.scrollBy({ left: -340, behavior: 'smooth' });
+                            }
+                          }}
+                        >
+                          <ChevronLeft className="w-5 h-5" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="absolute right-0 top-1/2 -translate-y-1/2 bg-white shadow-lg hover:bg-gray-50 z-10 h-10 w-10 border-gray-300"
+                          onClick={() => {
+                            if (scrollContainerRef.current) {
+                              scrollContainerRef.current.scrollBy({ left: 340, behavior: 'smooth' });
+                            }
+                          }}
+                        >
+                          <ChevronRight className="w-5 h-5" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3 p-4 rounded-lg border border-gray-200 bg-gray-50">
+                  <MapPin className="w-5 h-5 text-gray-400" />
+                  <p className="text-gray-500">Chưa có thông tin trạm</p>
+                </div>
+              )}
             </div>
           </div>
 
           {/* Right Column - Pricing and Booking */}
           <div className="space-y-6">
             {/* Pricing */}
-            <div>
-              <h3 className="text-lg font-semibold mb-4">Giá & đặt cọc</h3>
-              <div className="space-y-3 rounded-lg border border-muted-foreground/20 bg-white p-4 shadow-sm">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">
+            <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+              <h3 className="text-lg font-semibold mb-6 text-gray-900">
+                <span className="border-b-2 border-green-500 pb-2">Giá & đặt cọc</span>
+              </h3>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between py-3 px-4 rounded-lg bg-gray-50">
+                  <span className="text-sm text-gray-600">
                     Đơn giá thuê 1 ngày (24 giờ)
                   </span>
-                  <span className="font-semibold text-green-700">
+                  <span className="font-semibold text-green-700 text-lg">
                     {formatCurrency(pricePerDay)}
                   </span>
                 </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">
+                <div className="flex items-center justify-between py-3 px-4 rounded-lg bg-gray-50">
+                  <span className="text-sm text-gray-600">
                     Số ngày tính phí
                   </span>
                   <span className="font-semibold text-green-700">
@@ -654,93 +763,46 @@ const InfoRow = ({
                       : "Chưa xác định"}
                   </span>
                 </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">
+                <div className="flex items-center justify-between py-3 px-4 rounded-lg bg-gray-50">
+                  <span className="text-sm text-gray-600">
                     Đặt cọc bắt buộc
                   </span>
                   <span className="font-semibold text-blue-700">
                     {formatCurrency(depositAmount)}
                   </span>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Phí thuê được tính theo thời gian thực tế: đơn giá ngày × số
-                  ngày (làm tròn lên đến 1 ngày nếu thời gian &ge; 8 giờ).
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Quy định đặt cọc: ô tô 5.000.000đ, xe máy 1.000.000đ. Mức hiển
-                  thị ở trên áp dụng cho loại xe này.
-                </p>
+                <div className="mt-4 p-4 rounded-lg bg-blue-50 border border-blue-200">
+                  <p className="text-xs text-gray-600 leading-relaxed">
+                    Phí thuê được tính theo thời gian thực tế: đơn giá ngày × số
+                    ngày (làm tròn lên đến 1 ngày nếu thời gian ≥ 8 giờ).
+                  </p>
+                  <p className="text-xs text-gray-600 leading-relaxed mt-2">
+                    Quy định đặt cọc: ô tô 5.000.000đ, xe máy 1.000.000đ. Mức hiển
+                    thị ở trên áp dụng cho loại xe này.
+                  </p>
+                </div>
               </div>
             </div>
 
-            {/* Pickup option */}
-            <div className="border-2 border-green-100 rounded-lg p-4 bg-green-50">
-              <div className="flex items-center gap-2 mb-2">
-                <MapPin className="w-4 h-4 text-green-600" />
-                <span className="font-medium text-green-700">
-                  Hình thức nhận xe
-                </span>
-              </div>
-              <Select value={pickupOption} onValueChange={setPickupOption}>
-                <SelectTrigger className="bg-white">
-                  <SelectValue placeholder="Chọn hình thức nhận xe" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="self">Nhận xe tại trạm</SelectItem>
-                  <SelectItem value="delivery">
-                    Giao xe tận nơi (+ phí)
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="mt-2 text-xs text-muted-foreground">
-                {pickupOption === "self"
-                  ? "Bạn sẽ nhận xe trực tiếp tại điểm cho thuê."
-                  : "Nhân viên sẽ liên hệ để xác nhận địa chỉ và chi phí giao xe."}
-              </p>
-            </div>
-
-            {/* Payment method */}
-            <div className="border-2 border-blue-100 rounded-lg p-4 bg-blue-50">
-              <div className="flex items-center gap-2 mb-2">
-                <CreditCard className="w-4 h-4 text-blue-600" />
-                <span className="font-medium text-blue-700">
-                  Phương thức thanh toán
-                </span>
-              </div>
-              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                <SelectTrigger className="bg-white">
-                  <SelectValue placeholder="Chọn phương thức thanh toán" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="credit-card">
-                    Thẻ tín dụng/Ghi nợ
-                  </SelectItem>
-                  <SelectItem value="momo">Ví MoMo</SelectItem>
-                  <SelectItem value="zalopay">Ví ZaloPay</SelectItem>
-                  <SelectItem value="cash">Thanh toán tiền mặt</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Pickup option and Payment method removed per request */}
 
             {/* Rental Time */}
-            <div className="rounded-lg border border-muted-foreground/20 bg-white p-4 shadow-sm">
-              <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-                <div className="flex items-center gap-2">
-                  <CalendarIcon className="w-4 h-4 text-green-600" />
-                  <span className="font-medium text-green-700">
-                    Thời gian thuê
-                  </span>
-                </div>
+            <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+              <div className="flex items-center gap-2 mb-6">
+                <CalendarIcon className="w-5 h-5 text-green-600" />
+                <h3 className="text-lg font-semibold text-gray-900">
+                  <span className="border-b-2 border-green-500 pb-2">Thời gian thuê</span>
+                </h3>
                 {rentalDurationDays > 0 && (
-                  <Badge variant="outline" className="text-xs font-normal">
+                  <Badge variant="outline" className="text-xs font-normal bg-green-50 text-green-700 border-green-200">
                     Ước tính: {rentalDurationDays} ngày
                   </Badge>
                 )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                <div className="space-y-2">
+                  <Label className="text-xs uppercase tracking-wide text-gray-600 font-medium">
                     Ngày bắt đầu
                   </Label>
                   <DateTimePicker
@@ -751,8 +813,8 @@ const InfoRow = ({
                     showTime={false}
                   />
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                <div className="space-y-2">
+                  <Label className="text-xs uppercase tracking-wide text-gray-600 font-medium">
                     Ngày kết thúc
                   </Label>
                   <DateTimePicker
@@ -765,67 +827,69 @@ const InfoRow = ({
                 </div>
               </div>
 
-              <div className="mt-4 overflow-hidden rounded-md border border-muted-foreground/10">
+              <div className="overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
                 <table className="w-full text-sm">
                   <tbody>
-                    <tr className="border-b border-muted-foreground/10 bg-muted/30">
-                      <td className="px-3 py-2 font-medium text-muted-foreground">
+                    <tr className="border-b border-gray-200">
+                      <td className="px-4 py-3 font-medium text-gray-600">
                         Ngày bắt đầu
                       </td>
-                      <td className="px-3 py-2">
+                      <td className="px-4 py-3 font-semibold text-gray-900">
                         {startDate
                           ? format(startDate, "dd/MM/yyyy", { locale: vi })
                           : "Chưa chọn"}
                       </td>
                     </tr>
-                    <tr className="border-b border-muted-foreground/10">
-                      <td className="px-3 py-2 font-medium text-muted-foreground">
+                    <tr className="border-b border-gray-200">
+                      <td className="px-4 py-3 font-medium text-gray-600">
                         Ngày kết thúc
                       </td>
-                      <td className="px-3 py-2">
+                      <td className="px-4 py-3 font-semibold text-gray-900">
                         {endDate
                           ? format(endDate, "dd/MM/yyyy", { locale: vi })
                           : "Chưa chọn"}
                       </td>
                     </tr>
-                    <tr className="border-b border-muted-foreground/10">
-                      <td className="px-3 py-2 font-medium text-muted-foreground">
+                    <tr className="border-b border-gray-200">
+                      <td className="px-4 py-3 font-medium text-gray-600">
                         Số ngày thuê
                       </td>
-                      <td className="px-3 py-2">
+                      <td className="px-4 py-3 font-semibold text-gray-900">
                         {rentalDurationDays > 0
                           ? `${rentalDurationDays} ngày`
                           : "Chưa xác định"}
                       </td>
                     </tr>
                     <tr>
-                      <td className="px-3 py-2 font-medium text-muted-foreground">
+                      <td className="px-4 py-3 font-medium text-gray-600">
                         Yêu cầu tối thiểu
                       </td>
-                      <td className="px-3 py-2">≥ {minDurationDays} ngày</td>
+                      <td className="px-4 py-3 font-semibold text-gray-900">≥ {minDurationDays} ngày</td>
                     </tr>
                   </tbody>
                 </table>
               </div>
 
-              <p className="mt-3 text-xs text-muted-foreground">
-                Bạn có thể đặt trước tối đa {maxAdvanceDays} ngày kể từ thời
-                điểm hiện tại.
-              </p>
-              {advanceLimitExceeded && (
-                <p className="text-xs text-red-600 mt-1">
-                  Ngày bắt đầu vượt quá giới hạn đặt trước. Vui lòng chọn ngày
-                  sớm hơn.
+              <div className="mt-4 p-3 rounded-lg bg-blue-50 border border-blue-200">
+                <p className="text-xs text-gray-600">
+                  Bạn có thể đặt trước tối đa {maxAdvanceDays} ngày kể từ thời
+                  điểm hiện tại.
                 </p>
-              )}
+                {advanceLimitExceeded && (
+                  <p className="text-xs text-red-600 mt-2">
+                    Ngày bắt đầu vượt quá giới hạn đặt trước. Vui lòng chọn ngày
+                    sớm hơn.
+                  </p>
+                )}
+              </div>
 
               {startDate &&
                 endDate &&
                 (!isEndAfterStart || !isDurationValid) && (
-                  <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                    <div className="flex items-start gap-2">
-                      <AlertCircle className="mt-0.5 h-4 w-4" />
-                      <div className="space-y-1">
+                  <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
+                    <div className="flex items-start gap-3">
+                      <AlertCircle className="mt-0.5 h-5 w-5 text-amber-600" />
+                      <div className="space-y-1 text-sm text-amber-800">
                         {!isEndAfterStart && (
                           <p>Ngày kết thúc phải sau ngày bắt đầu.</p>
                         )}
@@ -842,22 +906,24 @@ const InfoRow = ({
             </div>
 
             {/* Bảo hiểm thuê xe */}
-            <div className="my-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <h4 className="font-semibold mb-2 text-black">
-                Bảo hiểm thuê xe
+            <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+              <h4 className="font-semibold mb-4 text-gray-900">
+                <span className="border-b-2 border-green-500 pb-2">Bảo hiểm thuê xe</span>
               </h4>
-              <p className="text-sm text-gray-700">
-                Chuyến đi có mua bảo hiểm. Khách thuê bồi thường tối đa{" "}
-                <span className="font-semibold text-red-600">
-                  2.000.000 VNĐ
-                </span>{" "}
-                trong trường hợp có sự cố ngoài ý muốn.
-              </p>
-              <div
-                className="mt-2 text-xs text-blue-600 cursor-pointer hover:underline"
-                onClick={() => setShowInsuranceModal(true)}
-              >
-                Xem thêm &gt;
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-gray-700 leading-relaxed">
+                  Chuyến đi có mua bảo hiểm. Khách thuê bồi thường tối đa{" "}
+                  <span className="font-semibold text-red-600">
+                    2.000.000 VNĐ
+                  </span>{" "}
+                  trong trường hợp có sự cố ngoài ý muốn.
+                </p>
+                <button
+                  className="mt-3 text-sm text-blue-600 hover:text-blue-800 hover:underline font-medium transition-colors"
+                  onClick={() => setShowInsuranceModal(true)}
+                >
+                  Xem thêm chi tiết →
+                </button>
               </div>
             </div>
 
@@ -944,44 +1010,60 @@ const InfoRow = ({
             )}
 
             {/* Total and Book Button */}
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 space-y-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Tiền thuê dự kiến</span>
-                <span className="font-semibold text-green-800">
-                  {rentalAmount > 0
-                    ? formatCurrency(rentalAmount)
-                    : "Chọn thời gian"}
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Đặt cọc</span>
-                <span className="font-semibold text-blue-700">
-                  {formatCurrency(depositAmount)}
-                </span>
-              </div>
-              <div className="flex justify-between items-center pt-2 border-t border-green-200 text-base font-semibold">
-                <span>Tổng thanh toán ban đầu</span>
-                <span className="text-green-900">
-                  {formatCurrency(totalPayable)}
-                </span>
+            <div className="bg-gradient-to-br from-green-50 to-green-100 border border-green-200 rounded-xl p-6 shadow-sm">
+              <h4 className="text-lg font-semibold mb-6 text-gray-900">
+                <span className="border-b-2 border-green-500 pb-2">Tổng thanh toán</span>
+              </h4>
+              
+              <div className="space-y-4">
+                <div className="flex justify-between items-center py-3 px-4 rounded-lg bg-white border border-green-200">
+                  <span className="text-gray-600 font-medium">Tiền thuê dự kiến</span>
+                  <span className="font-bold text-green-800 text-lg">
+                    {actualRentalAmount !== null
+                      ? formatCurrency(actualRentalAmount)
+                      : rentalAmount > 0
+                      ? formatCurrency(rentalAmount)
+                      : "Chọn thời gian"}
+                  </span>
+                </div>
+                
+                <div className="flex justify-between items-center py-3 px-4 rounded-lg bg-white border border-blue-200">
+                  <span className="text-gray-600 font-medium">Đặt cọc</span>
+                  <span className="font-bold text-blue-700">
+                    {formatCurrency(depositAmount)}
+                  </span>
+                </div>
+                
+                <div className="flex justify-between items-center py-4 px-4 rounded-lg bg-green-200 border-2 border-green-300">
+                  <span className="text-lg font-semibold text-gray-900">Tổng thanh toán ban đầu</span>
+                  <span className="text-xl font-bold text-green-900">
+                    {actualRentalAmount !== null
+                      ? formatCurrency(actualRentalAmount)
+                      : formatCurrency(totalPayable)}
+                  </span>
+                </div>
               </div>
 
               {advanceLimitExceeded && (
-                <p className="text-xs text-red-600">
-                  Ngày bắt đầu thuê không được vượt quá {maxAdvanceDays} ngày so
-                  với hiện tại.
-                </p>
+                <div className="mt-4 p-3 rounded-lg bg-red-50 border border-red-200">
+                  <p className="text-sm text-red-600">
+                    Ngày bắt đầu thuê không được vượt quá {maxAdvanceDays} ngày so
+                    với hiện tại.
+                  </p>
+                </div>
               )}
 
               {!isVehicleAvailable && (
-                <p className="text-xs text-red-600">
-                  Xe hiện không khả dụng để đặt. Vui lòng chọn xe khác hoặc quay
-                  lại sau.
-                </p>
+                <div className="mt-4 p-3 rounded-lg bg-red-50 border border-red-200">
+                  <p className="text-sm text-red-600">
+                    Xe hiện không khả dụng để đặt. Vui lòng chọn xe khác hoặc quay
+                    lại sau.
+                  </p>
+                </div>
               )}
 
               <Button
-                className="w-full bg-green-500 hover:bg-green-600"
+                className="w-full mt-6 bg-green-600 hover:bg-green-700 text-white font-semibold py-3 text-lg shadow-lg hover:shadow-xl transition-all duration-200"
                 onClick={handleBooking}
                 disabled={
                   !startDate ||
@@ -993,9 +1075,17 @@ const InfoRow = ({
                   !isVehicleAvailable
                 }
               >
-                {isBooking ? "Đang xử lý..." : "Thanh toán"}
+                {isBooking ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Đang xử lý...
+                  </div>
+                ) : (
+                  "Thanh toán ngay"
+                )}
               </Button>
-              <p className="text-xs text-muted-foreground">
+              
+              <p className="text-xs text-gray-600 mt-3 text-center">
                 Vui lòng hoàn tất thanh toán theo hướng dẫn để xác nhận đặt xe.
               </p>
             </div>
@@ -1168,11 +1258,9 @@ const InfoRow = ({
       >
         <DialogContent className="max-w-4xl">
           <DialogHeader>
-            <DialogTitle>Hướng dẫn chuyển khoản tạm thời</DialogTitle>
+            <DialogTitle>Thanh toán VietQR</DialogTitle>
             <DialogDescription>
-              Mã hóa đơn #{paymentInfo?.billingId ?? ""}. PayOS đang tạm thời
-              không khả dụng, vui lòng chuyển khoản thủ công theo hướng dẫn dưới
-              đây.
+              Mã hóa đơn #{paymentInfo?.billingId ?? ""}. Chuyển khoản vào tài khoản bên dưới hoặc scan QR code để hoàn tất thanh toán.
             </DialogDescription>
           </DialogHeader>
           {paymentInfo ? (
@@ -1184,8 +1272,7 @@ const InfoRow = ({
                   className="h-64 w-64 rounded-lg border bg-white p-3 shadow-sm"
                 />
                 <p className="text-sm text-muted-foreground text-center">
-                  Quét mã VietQR để thực hiện chuyển khoản tự động điền thông
-                  tin.
+                  Scan QR code bằng ứng dụng ngân hàng để chuyển khoản tự động điền thông tin.
                 </p>
               </div>
               <div className="space-y-3">
@@ -1222,7 +1309,7 @@ const InfoRow = ({
                       )
                     }
                   >
-                    Mở ảnh QR trong tab mới
+                    Mở QR VietQR trong tab mới
                   </Button>
                   <Button
                     variant="outline"
@@ -1267,6 +1354,8 @@ const InfoRow = ({
           )}
         </DialogContent>
       </Dialog>
+
+      <Footer />
     </div>
   );
 };

@@ -1,24 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { format } from "date-fns";
-import { CalendarIcon, CarFront, MapPin, Search } from "lucide-react";
+import { MapPin, Search, ChevronDown } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { API_BASE } from "@/services/authService";
+import { listStationsBrief, type StationBrief } from "@/services/stationServices";
 
 // ================== Types ==================
 // Vehicle types are dynamic from DB, keep as string with empty meaning "all"
@@ -39,246 +25,134 @@ interface SearchBarProps {
   };
 }
 
-const DATE_FORMAT = "dd/MM/yyyy";
-
-// ================== Helpers ==================
-const formatDateForDisplay = (date: Date | undefined) =>
-  date ? format(date, DATE_FORMAT) : undefined;
-
-const formatDateForSubmit = (date: Date | undefined) =>
-  date
-    ? new Intl.DateTimeFormat("vi-VN", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-      }).format(date)
-    : "";
+// Keep helpers for compatibility (submit empty values)
+const formatDateForSubmit = () => "";
 
 // ================== Component ==================
 export default function SearchBar({ onSubmit, defaultValues }: SearchBarProps) {
   const [location, setLocation] = useState("");
-  const [startDate, setStartDate] = useState<Date | undefined>();
-  const [endDate, setEndDate] = useState<Date | undefined>();
-  const [vehicleType, setVehicleType] = useState<VehicleType>("");
-  const [availableTypes, setAvailableTypes] = useState<string[]>([]);
+  const [vehicleType] = useState<VehicleType>("");
+  const [stations, setStations] = useState<StationBrief[]>([]);
+  const [openList, setOpenList] = useState(false);
+  const [address, setAddress] = useState("");
 
-  const [startOpen, setStartOpen] = useState(false);
-  const [endOpen, setEndOpen] = useState(false);
-
-  const endDateDisabled = useMemo(
-    () => (date: Date) => (startDate ? date < startDate : false),
-    [startDate],
-  );
-
-  // Parse date from dd/MM/yyyy or yyyy-MM-dd to Date
-  const parseDateInput = (s?: string): Date | undefined => {
-    if (!s) return undefined;
-    // yyyy-MM-dd
-    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
-      const [y, m, d] = s.split("-").map(Number);
-      const dt = new Date(y, (m || 1) - 1, d || 1);
-      return Number.isFinite(dt.getTime()) ? dt : undefined;
-    }
-    // dd/MM/yyyy
-    if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) {
-      const [d, m, y] = s.split("/").map(Number);
-      const dt = new Date(y || 0, (m || 1) - 1, d || 1);
-      return Number.isFinite(dt.getTime()) ? dt : undefined;
-    }
-    const dt = new Date(s);
-    return Number.isFinite(dt.getTime()) ? dt : undefined;
-  };
-
-  // Prefill from defaultValues when provided
-  useMemo(() => {
-    if (!defaultValues) return;
-    if (defaultValues.location !== undefined) setLocation(defaultValues.location);
-    if (defaultValues.vehicleType !== undefined) setVehicleType(defaultValues.vehicleType);
-    const s = parseDateInput(defaultValues.startDate);
-    const e = parseDateInput(defaultValues.endDate);
-    if (s) setStartDate(s);
-    if (e) setEndDate(e);
-  }, [defaultValues?.location, defaultValues?.vehicleType, defaultValues?.startDate, defaultValues?.endDate]);
-
-  // Load types dynamically from backend models to stay in-sync with DB
+  // Load stations once
   useEffect(() => {
     let cancelled = false;
-    type ModelMin = { type?: string | null };
-    const load = async () => {
+    (async () => {
       try {
-        const resp = await fetch(`${API_BASE}/models`);
-        if (!resp.ok) return;
-        const list = (await resp.json()) as ModelMin[];
-        const uniq: string[] = [];
-        const seen = new Set<string>();
-        for (const m of list) {
-          const t = (m.type || "").trim();
-          if (!t) continue;
-          const key = t.toLowerCase();
-          if (!seen.has(key)) {
-            seen.add(key);
-            uniq.push(t);
-          }
-        }
-        if (!cancelled) setAvailableTypes(uniq);
+        const list = await listStationsBrief();
+        if (!cancelled) setStations(list);
       } catch {
-        // ignore: fall back to static empty list (only shows "Tất cả")
+        if (!cancelled) setStations([]);
       }
-    };
-    load();
+    })();
     return () => { cancelled = true; };
   }, []);
+
+  const filteredStations = useMemo(() => stations, [stations]);
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    if (startDate && endDate && endDate < startDate) {
-      alert("Ngày trả xe không được nhỏ hơn ngày nhận xe!");
-      return;
-    }
-
     onSubmit({
       location,
-      startDate: formatDateForSubmit(startDate),
-      endDate: formatDateForSubmit(endDate),
+      startDate: formatDateForSubmit(),
+      endDate: formatDateForSubmit(),
       vehicleType,
     });
   };
 
   return (
-    <div className="w-full max-w-6xl mx-auto">
+    <div className="w-full md:w-[50%] max-w-6xl mx-auto">
       <div className="bg-white/95 backdrop-blur-sm p-8 rounded-3xl shadow-2xl border border-white/30">
         <form
           onSubmit={handleSubmit}
-          className="grid grid-cols-1 md:grid-cols-5 gap-6 items-end"
+          className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end"
         >
           {/* Địa điểm */}
-          <div className="space-y-2">
-            <label
-              htmlFor="search-location"
-              className="text-sm font-medium text-gray-700 flex items-center gap-2"
-            >
-              <MapPin className="h-4 w-4 text-primary" />
-              Địa điểm
-            </label>
+          <div className="space-y-2 relative md:col-span-5">
+            <label htmlFor="search-location" className="sr-only">Địa điểm</label>
+            {/* input styled like the orange version (rounded, icon inside, dropdown caret) */}
             <Input
               id="search-location"
-              placeholder="Ví dụ: Quận 1, Quận 2"
+              placeholder="Chọn địa điểm thuê xe"
               value={location}
-              onChange={(event) => setLocation(event.target.value)}
+              readOnly
+              onClick={() => setOpenList((v) => !v)}
+              onFocus={() => setOpenList(true)}
+              onBlur={() => {
+                // Delay closing to allow onMouseDown selection
+                setTimeout(() => setOpenList(false), 120);
+              }}
+              role="button"
+              className={cn(
+                // compact for horizontal layout
+                "h-12 text-base rounded-full pl-5 pr-11 shadow-sm bg-white",
+                // blue border like screenshot (but keep current palette elsewhere)
+                "border-2 border-[#173E7C] focus:border-[#173E7C]",
+                // subtle focus ring without changing color scheme
+                "focus:outline-none focus:ring-2 focus:ring-[#9BB4E3]",
+                // text colors
+                "text-slate-900 placeholder:text-slate-500"
+              )}
+            />
+            {/* Icon removed as requested */}
+            <ChevronDown
+              className={cn(
+                "absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground transition-transform",
+                openList ? "rotate-180" : "rotate-0"
+              )}
+            />
+            {openList && (
+              <div className="absolute z-50 mt-1 w-full max-h-64 overflow-auto rounded-xl border border-slate-200 bg-white shadow-lg">
+                {filteredStations.length === 0 ? (
+                  <div className="px-3 py-2 text-sm text-muted-foreground">Không có trạm phù hợp</div>
+                ) : (
+                  filteredStations.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      className="w-full text-left px-3 py-2 hover:bg-accent/30"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        setLocation(s.name);
+                        setAddress(s.address || "");
+                        setOpenList(false);
+                      }}
+                      title={s.name}
+                    >
+                      <div className="font-medium text-sm">{s.name}</div>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Địa điểm trạm (địa chỉ) bên cạnh */}
+          <div className="space-y-2 relative md:col-span-5">
+            <label htmlFor="station-address" className="sr-only">Địa chỉ</label>
+            <Input
+              id="station-address"
+              placeholder="Địa chỉ của trạm "
+              value={address}
+              readOnly
+              className={cn(
+                // same compact height
+                "h-12 text-base rounded-full pl-5 pr-5 shadow-sm bg-white",
+                "border-2 border-[#173E7C] focus:border-[#173E7C]",
+                "focus:outline-none focus:ring-2 focus:ring-[#9BB4E3]",
+                "text-slate-900 placeholder:text-slate-500"
+              )}
             />
           </div>
-
-          {/* Ngày nhận xe */}
-          <div className="space-y-2">
-            <span className="text-sm font-medium text-gray-700 flex items-center gap-2">
-              <CalendarIcon className="h-4 w-4 text-primary" />
-              Ngày nhận xe
-            </span>
-            <Popover open={startOpen} onOpenChange={setStartOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !startDate && "text-muted-foreground",
-                  )}
-                >
-                  {startDate ? (
-                    formatDateForDisplay(startDate)
-                  ) : (
-                    <span>Chọn ngày</span>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={startDate}
-                  onSelect={(value) => {
-                    setStartDate(value || undefined);
-                    if (value && endDate && endDate < value) {
-                      setEndDate(value);
-                    }
-                    setStartOpen(false);
-                  }}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-
-          {/* Ngày trả xe */}
-          <div className="space-y-2">
-            <span className="text-sm font-medium text-gray-700 flex items-center gap-2">
-              <CalendarIcon className="h-4 w-4 text-primary" />
-              Ngày trả xe
-            </span>
-            <Popover open={endOpen} onOpenChange={setEndOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !endDate && "text-muted-foreground",
-                  )}
-                >
-                  {endDate ? (
-                    formatDateForDisplay(endDate)
-                  ) : (
-                    <span>Chọn ngày</span>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={endDate}
-                  onSelect={(value) => {
-                    if (value && startDate && value < startDate) {
-                      return;
-                    }
-                    setEndDate(value || undefined);
-                    if (value) {
-                      setEndOpen(false);
-                    }
-                  }}
-                  disabled={endDateDisabled}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-
-          {/* Loại xe */}
-          <div className="space-y-2">
-            <span className="text-sm font-medium text-gray-700 flex items-center gap-2">
-              <CarFront className="h-4 w-4 text-primary" />
-              Loại xe
-            </span>
-            <Select
-              value={vehicleType || "all"}
-              onValueChange={(value) =>
-                setVehicleType(value === "all" ? "" : (value as VehicleType))
-              }
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Chọn loại xe (tùy chọn)" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tất cả</SelectItem>
-                {availableTypes.map((t) => (
-                  <SelectItem key={t} value={t}>{t}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Nút tìm */}
-          <div className="flex items-end">
+          
+          {/* Nút tìm nhỏ ở bên phải */}
+          <div className="flex items-end md:col-span-2">
             <Button
               type="submit"
-              className="w-full h-12 font-medium gap-2 bg-primary hover:bg-accent text-primary-foreground"
+              className="w-full h-12 rounded-full text-base font-semibold gap-2 bg-primary hover:bg-accent text-primary-foreground"
             >
               <Search className="w-5 h-5" />
               Tìm

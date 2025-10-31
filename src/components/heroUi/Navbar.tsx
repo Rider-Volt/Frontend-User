@@ -87,17 +87,8 @@ const Navbar: React.FC<NavbarProps> = ({ isLoggedIn, username }) => {
           <span className="text-2xl font-bold text-primary">EV Rental</span>
         </Link>
 
-        {/* Navigation links */}
-        <nav className="hidden md:flex items-center space-x-8">
-          <Link to="/" className="text-foreground hover:text-primary font-medium">
-            Trang chủ
-          </Link>
-          <Link to="/search" className="text-foreground hover:text-primary font-medium">
-            Tìm xe
-          </Link>
-          
-          
-        </nav>
+        {/* Navigation links removed as requested */}
+        <nav className="hidden md:flex items-center space-x-8" />
 
         {/* User actions */}
         <div className="flex items-center gap-3">
@@ -106,7 +97,7 @@ const Navbar: React.FC<NavbarProps> = ({ isLoggedIn, username }) => {
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
-                  className="flex items-center gap-2 font-medium hover:bg-accent/30 px-3 py-2 rounded-lg"
+                  className="flex items-center gap-2 font-semibold hover:bg-accent/30 px-4 py-3 rounded-xl text-base"
                 >
                   👋 <span className="text-primary">{internalUsername || "Bạn"}</span>
                 </Button>
@@ -115,23 +106,23 @@ const Navbar: React.FC<NavbarProps> = ({ isLoggedIn, username }) => {
               <DropdownMenuContent
                 align="end"
                 sideOffset={8}
-                className="w-48 rounded-lg shadow-lg border bg-popover text-popover-foreground"
+                className="w-64 rounded-xl shadow-lg border bg-popover text-popover-foreground text-base"
               >
-                <DropdownMenuLabel>
+                <DropdownMenuLabel className="text-base font-semibold">
                   Xin chào, <span className="font-semibold">{internalUsername || "Bạn"}</span>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
 
                 <DropdownMenuItem
                   onClick={() => navigate("/profile")}
-                  className="cursor-pointer hover:bg-accent/20"
+                  className="cursor-pointer hover:bg-accent/20 py-3"
                 >
                   Trang cá nhân
                 </DropdownMenuItem>
 
                 <DropdownMenuItem
                   onClick={() => navigate("/Bookings")}
-                  className="cursor-pointer hover:bg-accent/20"
+                  className="cursor-pointer hover:bg-accent/20 py-3"
                 >
                   Lịch sử đặt xe
                 </DropdownMenuItem>
@@ -140,7 +131,7 @@ const Navbar: React.FC<NavbarProps> = ({ isLoggedIn, username }) => {
 
                 <DropdownMenuItem
                   onClick={handleLogout}
-                  className="cursor-pointer text-red-600 hover:bg-red-50"
+                  className="cursor-pointer text-red-600 hover:bg-red-50 py-3"
                 >
                   Đăng xuất
                 </DropdownMenuItem>
@@ -177,12 +168,7 @@ const Navbar: React.FC<NavbarProps> = ({ isLoggedIn, username }) => {
             <DropdownMenuContent align="end" sideOffset={8} className="w-56">
               <DropdownMenuLabel>Menu</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link to="/" onClick={() => setMobileOpen(false)}>Trang chủ</Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link to="/search" onClick={() => setMobileOpen(false)}>Tìm xe</Link>
-              </DropdownMenuItem>
+              {/* Primary nav items removed: Trang chủ, Tìm xe */}
               <DropdownMenuItem asChild>
                 <Link to="/Stations" onClick={() => setMobileOpen(false)}>Điểm thuê</Link>
               </DropdownMenuItem>

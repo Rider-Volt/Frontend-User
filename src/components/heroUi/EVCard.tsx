@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Battery, Zap, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { VehicleData } from "@/data/vehicles";
+import { VehicleData } from "@/types/vehicle";
 
 const EVCard = (vehicle: VehicleData) => {
   const {

@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { Shield, Ticket, HeartHandshake } from "lucide-react";
 import Navbar from "../components/heroUi/Navbar";
-import SearchBar, { VehicleType } from "../components/heroUi/Searchbar";
+// Search bar removed from homepage
 import EVCard from "../components/heroUi/EVCard";
 import { useNavigate } from "react-router-dom";
 import { groupCarsByType } from "@/services/carServices";
-import { VehicleData } from "@/data/vehicles";
+import { VehicleData } from "@/types/vehicle";
 import { fetchVehiclesLimited } from "@/services/vehicleService";
 
 const Index: React.FC = () => {
@@ -34,20 +34,7 @@ const Index: React.FC = () => {
     }
   }, []);
 
-  const handleSearchSubmit = (params: {
-    location: string;
-    startDate: string;
-    endDate: string;
-    vehicleType: VehicleType;
-  }) => {
-    const searchParams = new URLSearchParams();
-    if (params.location) searchParams.append("location", params.location);
-    if (params.startDate) searchParams.append("start", params.startDate);
-    if (params.endDate) searchParams.append("end", params.endDate);
-    if (params.vehicleType) searchParams.append("type", params.vehicleType);
-
-    navigate(`/search?${searchParams.toString()}`);
-  };
+  // Search submit handler removed with SearchBar
 
   useEffect(() => {
     let cancelled = false;
@@ -93,10 +80,7 @@ const Index: React.FC = () => {
             <div className="absolute inset-0 bg-black/40" />
           </div>
 
-          {/* Floating Searchbar on top of the image */}
-          <div className="absolute top-6 left-1/2 -translate-x-1/2 z-20 w-full flex justify-center px-4">
-            <SearchBar onSubmit={handleSearchSubmit} />
-          </div>
+          {/* Search bar removed as requested */}
 
           <div className="relative z-10 container mx-auto px-4 text-center">
             <h1 className="text-6xl md:text-8xl font-extrabold leading-tight mb-6 text-white">

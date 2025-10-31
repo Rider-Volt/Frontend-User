@@ -35,7 +35,7 @@ const Register = () => {
     if (!formData.fullName.trim()) return "Vui lòng nhập họ và tên";
     if (!/\S+@\S+\.\S+/.test(formData.email)) return "Email không hợp lệ";
     if (!/^[0-9]{9,11}$/.test(formData.phone)) return "Số điện thoại không hợp lệ";
-    if (formData.password.length < 8) return "Mật khẩu phải ít nhất 8 ký tự";
+    if (formData.password.length < 6) return "Mật khẩu phải ít nhất 6 ký tự";
     if (formData.password !== formData.confirmPassword)
       return "Mật khẩu xác nhận không khớp";
     return null;

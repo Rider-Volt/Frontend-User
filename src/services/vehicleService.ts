@@ -1,5 +1,5 @@
 import { API_BASE } from "@/services/authService";
-import { VehicleData } from "@/data/vehicles";
+import { VehicleData } from "@/types/vehicle";
 
 // Backend Model response used for displaying vehicles to users
 interface BackendModel {
@@ -10,13 +10,13 @@ interface BackendModel {
   type?: string | null;
 }
 
-// Public listing chỉ dùng Model API mới của BE
+
 // ModelController: /api/models (GET), /api/models/{id} (GET)
 const MODEL_API = `${API_BASE}/models`;
 
 
 // Nếu có các API cũ khác (vehicle, car, ...), cần chuyển sang dùng /api/models hoặc /api/admin/vehicles, /api/staff/vehicles tuỳ role.
-// Hiện tại chỉ còn dùng Model API cho FE-User.
+
 type CacheEntry<T> = { data: T; expiresAt: number };
 const cache = new Map<string, CacheEntry<unknown>>();
 const inflight = new Map<string, Promise<unknown>>();

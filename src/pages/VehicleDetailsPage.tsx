@@ -41,7 +41,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"; // Nếu bạn dùng Radix hoặc custom dialog
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { appendBookingHistory, StoredBooking } from "@/services/bookingService";
 import { createBilling } from "@/services/renterBillingService";
@@ -55,7 +55,27 @@ import {
   mockMarkPaymentAsPaid,
 } from "@/services/paymentService";
 import { getCurrentUser, fetchProfileFromAPI } from "@/services/authService";
-import { VehicleData } from "@/data/vehicles";
+// Local minimal type to avoid external import resolution issues
+interface VehicleData {
+  id: number;
+  name: string;
+  type?: string;
+  pricePerDay?: number;
+  status?: string;
+  available?: boolean;
+  location?: string;
+  image?: string;
+  imageUrl?: string;
+  stationId?: number;
+  description?: string;
+  features?: {
+    seats?: number | string;
+    transmission?: string;
+    fuel?: string;
+    consumption?: string;
+  };
+}
+import { getHardcodedSpecs } from "../data/vehicleSpecs";
 import { fetchVehicleById } from "@/services/vehicleService";
 import { DateTimePicker } from "@/components/ui/date-time-picker";
 import { listStationsBrief, type StationBrief } from "@/services/stationServices";
@@ -72,6 +92,7 @@ const VehicleDetailsPage = () => {
   const [vehicleError, setVehicleError] = useState<string | null>(null);
   const [stations, setStations] = useState<StationBrief[]>([]);
   const [loadingStations, setLoadingStations] = useState(true);
+  const [selectedStationId, setSelectedStationId] = useState<number | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Booking form state
@@ -114,6 +135,9 @@ const VehicleDetailsPage = () => {
         const data = await listStationsBrief();
         if (!cancelled) {
           setStations(data);
+          // Default selection: vehicle's station if available, otherwise first station
+          const defaultId = (vehicle as any)?.stationId || data[0]?.id || null;
+          setSelectedStationId(typeof defaultId === "number" ? defaultId : null);
         }
       } catch (err) {
         console.error("Error loading stations:", err);
@@ -439,7 +463,7 @@ const InfoRow = ({
     const toDateOnly = (date: Date) => format(date, "yyyy-MM-dd");
     const payload = {
       modelId: vehicle.id,
-      stationId: vehicle.stationId || 1,
+      stationId: selectedStationId ?? (vehicle.stationId || 1),
       plannedStartDate: toDateOnly(startDate),
       plannedEndDate: toDateOnly(endDate),
     };
@@ -576,6 +600,13 @@ const InfoRow = ({
               <h2 className="text-xl font-semibold mb-6 text-gray-900">
                 <span className="border-b-2 border-green-500 pb-2">Đặc điểm</span>
               </h2>
+              {(() => {
+                const specs = getHardcodedSpecs(vehicle.name);
+                const seats = specs?.seats ?? vehicle.features?.seats;
+                const transmission = specs?.transmission ?? vehicle.features?.transmission;
+                const fuel = specs?.fuel ?? vehicle.features?.fuel ?? "Điện";
+                const consumption = specs?.consumption ?? vehicle.features?.consumption;
+                return (
               <div className="grid grid-cols-2 gap-6">
                 <div className="flex items-center gap-4 p-4 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
                   <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -585,7 +616,7 @@ const InfoRow = ({
                     <span className="text-sm text-gray-500 font-medium">
                       Số ghế
                     </span>
-                    <p className="font-semibold text-gray-900">{vehicle.features?.seats} chỗ</p>
+                    <p className="font-semibold text-gray-900">{seats} chỗ</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-4 p-4 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
@@ -596,9 +627,7 @@ const InfoRow = ({
                     <span className="text-sm text-gray-500 font-medium">
                       Truyền động
                     </span>
-                    <p className="font-semibold text-gray-900">
-                      {vehicle.features?.transmission}
-                    </p>
+                    <p className="font-semibold text-gray-900">{transmission}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-4 p-4 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
@@ -609,7 +638,7 @@ const InfoRow = ({
                     <span className="text-sm text-gray-500 font-medium">
                       Nhiên liệu
                     </span>
-                    <p className="font-semibold text-gray-900">{vehicle.features?.fuel}</p>
+                    <p className="font-semibold text-gray-900">{fuel}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-4 p-4 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
@@ -620,12 +649,12 @@ const InfoRow = ({
                     <span className="text-sm text-gray-500 font-medium">
                       Tiêu hao
                     </span>
-                    <p className="font-semibold text-gray-900">
-                      {vehicle.features?.consumption}
-                    </p>
+                    <p className="font-semibold text-gray-900">{consumption}</p>
                   </div>
                 </div>
               </div>
+                );
+              })()}
             </div>
 
             {/* Description */}
@@ -634,7 +663,11 @@ const InfoRow = ({
                 <span className="border-b-2 border-green-500 pb-2">Mô tả</span>
               </h2>
               <p className="text-gray-600 leading-relaxed">
-                {vehicle.description || "Thông tin mô tả chi tiết về xe sẽ được cập nhật sớm nhất."}
+                {(() => {
+                  const specs = getHardcodedSpecs(vehicle.name);
+                  const desc = specs?.description || vehicle.description;
+                  return desc || "Thông tin mô tả chi tiết về xe sẽ được cập nhật sớm nhất.";
+                })()}
               </p>
             </div>
 
@@ -881,6 +914,56 @@ const InfoRow = ({
                     sớm hơn.
                   </p>
                 )}
+              </div>
+
+              {/* Station selection */}
+              <div className="mt-6">
+                <div className="flex items-center gap-2 mb-2">
+                  <MapPin className="w-5 h-5 text-green-600" />
+                  <h4 className="text-base font-semibold text-gray-900">Chọn trạm nhận xe</h4>
+                  {loadingStations && (
+                    <span className="text-xs text-gray-500">Đang tải trạm…</span>
+                  )}
+                </div>
+
+                <div className="grid gap-3">
+                  <Select
+                    value={selectedStationId != null ? String(selectedStationId) : undefined}
+                    onValueChange={(v) => setSelectedStationId(Number(v))}
+                    disabled={loadingStations || stations.length === 0}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Chọn trạm" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {stations.map((s) => (
+                        <SelectItem key={s.id} value={String(s.id)}>
+                          {s.name} — {[s.district, s.city].filter(Boolean).join(", ")}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  {selectedStationId != null && (
+                    <div className="rounded-lg border border-gray-200 bg-white p-4">
+                      {(() => {
+                        const s = stations.find((x) => x.id === selectedStationId);
+                        if (!s) return null;
+                        return (
+                          <div className="space-y-1 text-sm">
+                            <div className="font-semibold text-gray-900">{s.name}</div>
+                            <div className="text-gray-700">{s.address}</div>
+                            <div className="text-gray-500">{[s.district, s.city].filter(Boolean).join(", ")}</div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
+
+                  {!loadingStations && stations.length === 0 && (
+                    <div className="text-sm text-gray-500">Không có dữ liệu trạm.</div>
+                  )}
+                </div>
               </div>
 
               {startDate &&

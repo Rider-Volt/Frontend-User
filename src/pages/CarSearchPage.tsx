@@ -3,7 +3,7 @@ import { useLocation } from "react-router-dom";
 import Navbar from "../components/heroUi/Navbar";
 import SearchBar, { VehicleType } from "../components/heroUi/Searchbar";
 import EVCard from "../components/heroUi/EVCard"; // 👈 dùng lại EVCard
-import { VehicleData } from "@/data/vehicles";
+import { VehicleData } from "@/types/vehicle";
 import { fetchVehiclesFiltered } from "@/services/vehicleService";
 
 const CarSearchPage = () => {

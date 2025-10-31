@@ -96,7 +96,7 @@ const paymentMethodText = (method?: string) => {
   }
 };
 
-const fallbackImage = "https://via.placeholder.com/128x96?text=EV";
+const fallbackImage = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTI4IiBoZWlnaHQ9Ijk2IiB2aWV3Qm94PSIwIDAgMTI4IDk2IiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIxMjgiIGhlaWdodD0iOTYiIGZpbGw9IiNmM2Y0ZjYiLz48dGV4dCB4PSI2NCIgeT0iNTIiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzY2NjY2NiIgdGV4dC1hbmNob3I9Im1pZGRsZSI+RVY8L3RleHQ+PC9zdmc+";
 
 const formatDate = (value?: string | null, pattern = "dd/MM/yyyy") => {
   if (!value) return "—";
@@ -188,8 +188,8 @@ const mergeBookings = (
 
   const combined = [...mergedRemote, ...onlyLocal];
   combined.sort((a, b) => {
-    const timeA = parseTime(a.startDay) || parseTime(a.bookingTime);
-    const timeB = parseTime(b.startDay) || parseTime(b.bookingTime);
+    const timeA = parseTime((a as any).startDay) || parseTime(a.bookingTime);
+    const timeB = parseTime((b as any).startDay) || parseTime(b.bookingTime);
     return timeB - timeA;
   });
 
@@ -448,6 +448,9 @@ const Bookings = () => {
         const normalizedRemote = remoteList.map((entry) => ({
           ...entry,
           bookingId: entry.id,
+          // Map new API fields to legacy fields for backward compatibility
+          startDay: (entry as any).plannedStartDate ?? (entry as any).startDay,
+          endDay: (entry as any).plannedEndDate ?? (entry as any).endDay,
         })) as StoredBooking[];
         const merged = mergeBookings(normalizedRemote, localHistory);
         setBookings(merged);
@@ -657,16 +660,23 @@ const Bookings = () => {
     return items.map((booking, index) => {
       const id = booking.id ?? booking.bookingId;
       const total = booking.totalCost ?? booking.totalCharge ?? null;
-      const start = formatDate(booking.startDay);
-      const end = formatDate(booking.endDay);
+      const start = formatDate((booking as any).startDay);
+      const end = formatDate((booking as any).endDay);
       const bookingTime = formatDateTime(booking.bookingTime);
-      const hours =
-        booking.startDay && booking.endDay
-          ? differenceInHours(
-              parseISO(booking.endDay),
-              parseISO(booking.startDay)
-            )
-          : undefined;
+      const actualPickup = formatDateTime((booking as any).actualPickupAt);
+      const actualReturn = formatDateTime((booking as any).actualReturnAt);
+      
+      // Only show return time if we have actual return time
+      const showReturnTime = actualReturn !== "—";
+      // Use rentedDay from API if available, otherwise calculate from dates
+      const days = booking.rentedDay ?? (
+        (booking as any).startDay && (booking as any).endDay
+          ? Math.ceil(differenceInHours(
+              parseISO((booking as any).endDay),
+              parseISO((booking as any).startDay)
+            ) / 24)
+          : undefined
+      );
       const vehicleName =
         booking.localVehicleName ?? booking.vehicleModel ?? `Hóa đơn #${id}`;
       const allowPay = booking.status === "WAITING";
@@ -696,6 +706,18 @@ const Bookings = () => {
                         <FileText className="h-4 w-4 text-emerald-600" />
                         {id ? `#${id}` : "Chưa có mã"}
                       </span>
+                      {booking.vehicleCode && (
+                        <span className="flex items-center gap-1.5">
+                          <Car className="h-4 w-4 text-gray-400" />
+                          Mã xe: {booking.vehicleCode}
+                        </span>
+                      )}
+                      {booking.stationName && (
+                        <span className="flex items-center gap-1.5">
+                          <MapPin className="h-4 w-4 text-gray-400" />
+                          {booking.stationName}
+                        </span>
+                      )}
                       {booking.renterName && (
                         <span className="flex items-center gap-1.5">
                           <User className="h-4 w-4 text-gray-400" />
@@ -755,14 +777,62 @@ const Bookings = () => {
                   </div>
                 </div>
               </div>
+
+              {days != null && (
+                <div className="bg-gray-50 rounded-lg p-4 border border-gray-100">
+                  <div className="flex items-start gap-3">
+                    <Calendar className="h-5 w-5 flex-shrink-0 text-emerald-600 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                        SỐ NGÀY THUÊ
+                      </p>
+                      <p className="text-sm font-semibold text-gray-900">
+                        {days} {days === 1 ? 'ngày' : 'ngày'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {actualPickup !== "—" && (
+                <div className="bg-emerald-50 rounded-lg p-4 border border-emerald-100">
+                  <div className="flex items-start gap-3">
+                    <Calendar className="h-5 w-5 flex-shrink-0 text-emerald-600 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-emerald-600 mb-1">
+                        Nhận xe thực tế
+                      </p>
+                      <p className="text-sm font-semibold text-gray-900">
+                        {actualPickup}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {showReturnTime && (
+                <div className="bg-emerald-50 rounded-lg p-4 border border-emerald-100">
+                  <div className="flex items-start gap-3">
+                    <Calendar className="h-5 w-5 flex-shrink-0 text-emerald-600 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-emerald-600 mb-1">
+                        Trả xe thực tế
+                      </p>
+                      <p className="text-sm font-semibold text-gray-900">
+                        {actualReturn}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {booking.pickupLocation && (
-              <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
+              <div className="bg-emerald-50 rounded-lg p-4 border border-emerald-100">
                 <div className="flex items-start gap-3">
-                  <MapPin className="h-5 w-5 flex-shrink-0 text-blue-600 mt-0.5" />
+                  <MapPin className="h-5 w-5 flex-shrink-0 text-emerald-600 mt-0.5" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-blue-600 mb-1">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-emerald-600 mb-1">
                       ĐIỂM NHẬN XE
                     </p>
                     <p className="text-sm font-medium text-gray-900 break-words">
@@ -772,6 +842,7 @@ const Bookings = () => {
                 </div>
               </div>
             )}
+
 
             {allowPay && (
               <div className="flex flex-wrap gap-3 pt-2">

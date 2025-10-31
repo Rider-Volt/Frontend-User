@@ -61,8 +61,8 @@ export type BillingStatus =
 export interface CreateBillingRequest {
   stationId: number;
   modelId: number;
-  plannedStartDate: string; // yyyy-MM-dd
-  plannedEndDate: string;   // yyyy-MM-dd
+  plannedStartDate: string; 
+  plannedEndDate: string;   
 }
 
 export interface RenterBillingResponse {
@@ -70,14 +70,19 @@ export interface RenterBillingResponse {
   renterName: string;
   vehicleCode: string;
   vehicleModel: string;
+  stationId: number;
+  stationName: string;
   rentedDay: number;
   bookingTime: string;
-  startDay: string;
-  endDay: string;
+  plannedStartDate: string;
+  plannedEndDate: string;
+  actualPickupAt?: string | null;
+  actualReturnAt?: string | null;
   preImage?: string | null;
   finalImage?: string | null;
   status: BillingStatus;
   totalCost?: number | null;
+  note?: string | null;
 }
 
 export async function createBilling(

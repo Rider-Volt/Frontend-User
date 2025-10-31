@@ -15,6 +15,12 @@ export type StoredBooking = RenterBillingResponse & {
    */
   bookingId?: number;
   /**
+   * Legacy date fields for backward compatibility.
+   * Maps from plannedStartDate/plannedEndDate.
+   */
+  startDay?: string;
+  endDay?: string;
+  /**
    * UI-only enrichment captured at booking time.
    */
   localVehicleName?: string;
@@ -59,8 +65,9 @@ function normalizeStored(entry: StoredBooking): StoredBooking {
     (BookingStatuses as readonly string[]).includes(statusCandidate)
       ? (statusCandidate as BillingStatus)
       : statusMap[String(statusCandidate).toUpperCase()] || "WAITING";
-  const startDay = entry.startDay ?? legacy.startTime ?? "";
-  const endDay = entry.endDay ?? legacy.endTime ?? "";
+  // Support both old format (startDay/endDay) and new format (plannedStartDate/plannedEndDate)
+  const startDay = (entry as any).startDay ?? (entry as any).plannedStartDate ?? legacy.startTime ?? "";
+  const endDay = (entry as any).endDay ?? (entry as any).plannedEndDate ?? legacy.endTime ?? "";
   const totalCost =
     entry.totalCost ?? legacy.totalPrice ?? legacy.price ?? undefined;
   return {

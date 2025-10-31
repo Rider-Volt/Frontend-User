@@ -1,5 +1,5 @@
 // src/services/carService.ts
-import type { VehicleData } from "@/data/vehicles";
+import type { VehicleData } from "@/types/vehicle";
 
 // Normalize any incoming vehicle type labels to E-* categories used in UI
 function normalizeType(input?: string): "E-Scooter" | "E-Bike" | "E-Car" | "Khác" {

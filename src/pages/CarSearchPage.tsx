@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import Navbar from "../components/heroUi/Navbar";
-import SearchBar, { VehicleType } from "../components/heroUi/Searchbar";
 import EVCard from "../components/heroUi/EVCard"; // 👈 dùng lại EVCard
 import { VehicleData } from "@/types/vehicle";
 import { fetchVehiclesFiltered } from "@/services/vehicleService";
+
+// VehicleType is just a string (empty means "all")
+type VehicleType = string;
 
 const CarSearchPage = () => {
   const [location, setLocation] = useState("");
@@ -76,18 +78,6 @@ const CarSearchPage = () => {
     };
   }, [location, vehicleType, filtersReady]);
 
-  // ✅ SearchBar submit → cập nhật filter state
-  const handleSearchSubmit = (params: {
-    location: string;
-    startDate: string;
-    endDate: string;
-    vehicleType: VehicleType;
-  }) => {
-    setLocation(params.location);
-    setStartDate(params.startDate);
-    setEndDate(params.endDate);
-    setVehicleType(params.vehicleType);
-  };
   // ✅ If server already filtered, keep simple availability check
   const filteredCars = vehicles.filter((car) => (car.available ?? true));
 
@@ -95,24 +85,7 @@ const CarSearchPage = () => {
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-secondary/20 to-accent/20">
       <Navbar isLoggedIn={isLoggedIn} username={username} />
 
-      <section className="container mx-auto px-4 py-12 text-center">
-        <h1 className="text-3xl font-bold text-center mb-8">
-          Tìm kiếm xe điện phù hợp
-        </h1>
-        <div className="max-w-5xl mx-auto">
-          <SearchBar
-            onSubmit={handleSearchSubmit}
-            defaultValues={{
-              location,
-              startDate,
-              endDate,
-              vehicleType,
-            }}
-          />
-        </div>
-      </section>
-
-      <section className="container mx-auto px-4 pb-20">
+      <section className="container mx-auto px-4 pb-20 pt-12">
         <h2 className="text-2xl font-bold mb-6">Danh sách xe có sẵn</h2>
         {loading ? (
           <p>Đang tải danh sách xe…</p>

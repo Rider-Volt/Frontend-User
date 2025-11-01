@@ -306,21 +306,6 @@ const Profile = () => {
               </div>
 
               <div className="space-y-6">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center p-4 rounded-lg bg-green-50 border border-green-200">
-                    <p className="text-2xl font-bold text-green-700">
-                      {profile.totalBookings ?? 0}
-                    </p>
-                    <p className="text-sm text-green-600 font-medium">Đặt xe</p>
-                  </div>
-                  <div className="text-center p-4 rounded-lg bg-blue-50 border border-blue-200">
-                    <p className="text-lg font-bold text-blue-700">
-                      {(profile.totalSpent ?? 0) > 0 ? `${(profile.totalSpent ?? 0).toLocaleString('vi-VN')}đ` : '—'}
-                    </p>
-                    <p className="text-sm text-blue-600 font-medium">Đã chi</p>
-                  </div>
-                </div>
-
                 <div className="space-y-3">
                   <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50">
                     <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">

@@ -129,20 +129,20 @@ const Footer = () => {
         <div className="border-t border-gray-700 mt-8 pt-8">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-gray-400 text-sm">
-              © 2024 EV Rental. Tất cả quyền được bảo lưu.
+              © 2025 EV Rental. 
             </p>
             <div className="flex gap-6">
               <Link 
                 to="/privacy" 
                 className="text-gray-400 hover:text-green-400 transition-colors text-sm"
               >
-                Chính sách bảo mật
+               
               </Link>
               <Link 
                 to="/terms" 
                 className="text-gray-400 hover:text-green-400 transition-colors text-sm"
               >
-                Điều khoản sử dụng
+               
               </Link>
             </div>
           </div>

@@ -304,7 +304,7 @@ const InfoRow = ({
     try {
       await mockMarkPaymentAsPaid(payOsPayment.billingId);
       toast({
-        title: "Đã ghi nhận thanh toán demo",
+        title: "Thanh toán thành công",
         description:
           "Hóa đơn sẽ chuyển sang trạng thái chờ nhân viên xác nhận.",
       });
@@ -1383,49 +1383,23 @@ const InfoRow = ({
                 )}
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <Button
-                    className="flex-1"
-                    onClick={() =>
-                      window.open(
-                        paymentInfo.qrImageUrl,
-                        "_blank",
-                        "noopener,noreferrer"
-                      )
-                    }
-                  >
-                    Mở QR VietQR trong tab mới
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="flex-1"
-                    onClick={async () => {
-                      try {
-                        await navigator.clipboard.writeText(
-                          paymentInfo.description
-                        );
-                        toast({
-                          title: "Đã sao chép nội dung chuyển khoản",
-                          description: paymentInfo.description,
-                        });
-                      } catch {
-                        toast({
-                          title: "Không thể sao chép",
-                          description: paymentInfo.description,
-                          variant: "destructive",
-                        });
-                      }
-                    }}
-                  >
-                    Sao chép nội dung
-                  </Button>
-                  <Button
                     variant="ghost"
                     className="flex-1"
                     onClick={() => {
                       setPaymentInfo(null);
-                      navigate("/bookings");
+                      navigate("/bookings?tab=waiting");
                     }}
                   >
                     Đóng
+                  </Button>
+                  <Button
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+                    onClick={() => {
+                      setPaymentInfo(null);
+                      navigate("/bookings?tab=payed");
+                    }}
+                  >
+                    Tôi đã thanh toán
                   </Button>
                 </div>
               </div>

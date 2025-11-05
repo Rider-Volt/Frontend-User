@@ -10,6 +10,7 @@ import VehicleDetailsPage from "./pages/VehicleDetailsPage";
 import Profile from "./pages/Profile";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import ResetPassword from "./pages/ResetPassword";
 // StationsPage removed per request
 import NotFound from "./pages/NotFound";
 
@@ -31,6 +32,8 @@ const App = () => (
           <Route path="/profile" element={<Profile />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ResetPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
 
          
 

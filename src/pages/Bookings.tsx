@@ -1,7 +1,8 @@
 ﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import { differenceInHours, format, parseISO } from "date-fns";
 import { vi } from "date-fns/locale";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { AlertTriangle } from "lucide-react";
 import {
   Calendar,
   Car,
@@ -254,24 +255,6 @@ const PaymentDialog = ({
     note: (payload as DemoPaymentInfo).note
   } : null;
 
-const handleCopyLink = async () => {
-  if (!checkoutUrl) return;
-  try {
-    await navigator.clipboard.writeText(checkoutUrl);
-    toast?.({
-      title: "Đã sao chép liên kết thanh toán",
-      description: checkoutUrl,
-    });
-  } catch (error) {
-    console.warn("Không thể sao chép liên kết PayOS", error);
-    toast?.({
-      title: "Không thể sao chép liên kết",
-      description: checkoutUrl,
-      variant: "destructive",
-    });
-  }
-};
-
   return (
     <Dialog open={!!state} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-2xl">
@@ -332,39 +315,6 @@ const handleCopyLink = async () => {
                   value={String(bankInfo.accountNumber)}
                 />
               </div>
-            </div>
-          )}
-
-          {(checkoutUrl || qrUrl) && (
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <Button
-                className="flex-1"
-                onClick={() =>
-                  checkoutUrl &&
-                  window.open(checkoutUrl, "_blank", "noopener,noreferrer")
-                }
-                disabled={!checkoutUrl}
-              >
-                Mở trang thanh toán
-              </Button>
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={handleCopyLink}
-                disabled={!checkoutUrl}
-              >
-                Sao chép liên kết
-              </Button>
-              <Button
-                variant="secondary"
-                className="flex-1"
-                onClick={() =>
-                  qrUrl && window.open(qrUrl, "_blank", "noopener,noreferrer")
-                }
-                disabled={!qrUrl}
-              >
-                Mở mã QR
-              </Button>
             </div>
           )}
 
@@ -434,6 +384,8 @@ const Bookings = () => {
 
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState<string>("all");
 
   const loadBookings = useCallback(
     async (userId: number, options?: { silent?: boolean; forceRefresh?: boolean }) => {
@@ -483,6 +435,14 @@ const Bookings = () => {
     },
     [toast]
   );
+
+  // Kiểm tra URL params để set tab mặc định
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam && ["all", "waiting", "payed", "renting", "done", "cancelled"].includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     const user = getCurrentUser();
@@ -560,7 +520,7 @@ const Bookings = () => {
     if (ok) {
       toast({
         title: "Đã cập nhật danh sách hóa đơn",
-        description: "Trạng thái từ staff đã được đồng bộ",
+        
       });
     }
   };
@@ -680,6 +640,42 @@ const Bookings = () => {
       const vehicleName =
         booking.localVehicleName ?? booking.vehicleModel ?? `Hóa đơn #${id}`;
       const allowPay = booking.status === "WAITING";
+      
+      // Tính thời gian còn lại trước khi tự hủy (180 giây từ bookingTime)
+      const paymentExpiredAt = booking.paymentExpiredAt || booking.lockExpiredAt;
+      const getTimeRemaining = () => {
+        if (booking.status !== "WAITING") return null;
+        
+        let expiredTime: number | null = null;
+        
+        // Ưu tiên dùng paymentExpiredAt hoặc lockExpiredAt từ API
+        if (paymentExpiredAt) {
+          try {
+            expiredTime = new Date(paymentExpiredAt).getTime();
+            if (isNaN(expiredTime)) expiredTime = null;
+          } catch {
+            expiredTime = null;
+          }
+        }
+        
+        // Fallback: tính từ bookingTime + 180 giây nếu không có expiredAt từ API
+        if (expiredTime === null && booking.bookingTime) {
+          try {
+            const bookingTimeMs = new Date(booking.bookingTime).getTime();
+            if (!isNaN(bookingTimeMs)) {
+              expiredTime = bookingTimeMs + 180000; // 180 giây = 180000ms
+            }
+          } catch {
+            return null;
+          }
+        }
+        
+        if (expiredTime === null) return null;
+        
+        const now = Date.now();
+        const remaining = Math.max(0, Math.floor((expiredTime - now) / 1000));
+        return remaining;
+      };
 
       return (
         <Card key={id ?? `local-${index}`} className="overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
@@ -706,6 +702,12 @@ const Bookings = () => {
                         <FileText className="h-4 w-4 text-emerald-600" />
                         {id ? `#${id}` : "Chưa có mã"}
                       </span>
+                      {booking.vehicleLicensePlate && (
+                        <span className="flex items-center gap-1.5 font-semibold text-emerald-700">
+                          <Car className="h-4 w-4 text-emerald-600" />
+                          Biển số: {booking.vehicleLicensePlate}
+                        </span>
+                      )}
                       {booking.vehicleCode && (
                         <span className="flex items-center gap-1.5">
                           <Car className="h-4 w-4 text-gray-400" />
@@ -794,7 +796,8 @@ const Bookings = () => {
                 </div>
               )}
 
-              {actualPickup !== "—" && (
+              {/* Chỉ hiển thị "Nhận xe thực tế" khi đã thực sự check-in (status RENTING hoặc DONE) */}
+              {actualPickup !== "—" && (booking.status === "RENTING" || booking.status === "DONE") && (
                 <div className="bg-emerald-50 rounded-lg p-4 border border-emerald-100">
                   <div className="flex items-start gap-3">
                     <Calendar className="h-5 w-5 flex-shrink-0 text-emerald-600 mt-0.5" />
@@ -843,6 +846,62 @@ const Bookings = () => {
               </div>
             )}
 
+            {/* Countdown timer cho đơn chờ thanh toán */}
+            {allowPay && (() => {
+              const initialTime = getTimeRemaining();
+              if (initialTime === null) return null;
+
+              const PaymentCountdown = () => {
+                const [timeRemaining, setTimeRemaining] = useState<number | null>(initialTime);
+
+                useEffect(() => {
+                  if (timeRemaining === null || timeRemaining <= 0) return;
+
+                  const interval = setInterval(() => {
+                    const remaining = getTimeRemaining();
+                    setTimeRemaining(remaining);
+                    
+                    // Nếu hết thời gian, tự động refresh
+                    if (remaining !== null && remaining <= 0) {
+                      if (currentUserId) {
+                        loadBookings(currentUserId, { silent: true });
+                      }
+                    }
+                  }, 1000);
+
+                  return () => clearInterval(interval);
+                }, [timeRemaining, currentUserId, loadBookings]);
+
+                if (timeRemaining === null) return null;
+
+                const minutes = Math.floor(timeRemaining / 60);
+                const seconds = timeRemaining % 60;
+                const isUrgent = timeRemaining < 60; // Cảnh báo khi còn < 60 giây
+
+                return (
+                  <div className={`rounded-lg p-4 border ${isUrgent ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'}`}>
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className={`h-5 w-5 flex-shrink-0 mt-0.5 ${isUrgent ? 'text-red-600' : 'text-amber-600'}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-xs font-semibold uppercase tracking-wide mb-1 ${isUrgent ? 'text-red-600' : 'text-amber-600'}`}>
+                          THỜI GIAN CÒN LẠI ĐỂ THANH TOÁN
+                        </p>
+                        <p className={`text-lg font-bold ${isUrgent ? 'text-red-700' : 'text-amber-700'}`}>
+                          {minutes}:{seconds.toString().padStart(2, '0')}
+                        </p>
+                        <p className="text-xs text-gray-600 mt-1">
+                          {timeRemaining > 0 
+                            ? 'Vui lòng thanh toán trong thời gian này để không bị hủy đơn tự động' 
+                            : 'Đơn đã hết hạn thanh toán'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              };
+
+              return <PaymentCountdown key={`countdown-${id}`} />;
+            })()}
 
             {allowPay && (
               <div className="flex flex-wrap gap-3 pt-2">
@@ -968,7 +1027,7 @@ const Bookings = () => {
             </div>
           </div>
 
-          <Tabs defaultValue="all" className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 bg-white border border-gray-200 rounded-lg p-1.5 gap-1 h-auto">
               <TabsTrigger 
                 value="all" 
@@ -1062,13 +1121,15 @@ const Bookings = () => {
             try {
               await mockMarkPaymentAsPaid(paymentDialog.bookingId);
               toast({
-                title: "Đã ghi nhận thanh toán demo",
+                title: "Thanh toán thành công",
                 description: "Hóa đơn sẽ chuyển sang trạng thái chờ xác nhận của nhân viên.",
               });
               setPaymentDialog(null);
               if (currentUserId) {
                 await loadBookings(currentUserId, { silent: true });
               }
+              // Chuyển đến tab "Đã thanh toán"
+              setActiveTab("payed");
             } catch (err) {
               toast({
                 title: "Không thể đánh dấu thanh toán",

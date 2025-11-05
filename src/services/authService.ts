@@ -636,3 +636,70 @@ export function staffLogout(): void {
     localStorage.removeItem("staff_user");
   } catch {}
 }
+
+// Password Reset
+export interface ResetPasswordPayload {
+  email: string;
+  newPassword: string;
+  confirmPassword: string;
+  passwordMatching: boolean;
+}
+
+export async function resetPassword(payload: ResetPasswordPayload): Promise<void> {
+  // Validation
+  if (!payload.email?.trim()) {
+    throw new Error("Email không được để trống");
+  }
+  
+  if (!payload.newPassword?.trim()) {
+    throw new Error("Mật khẩu mới không được để trống");
+  }
+  
+  if (!payload.confirmPassword?.trim()) {
+    throw new Error("Xác nhận mật khẩu không được để trống");
+  }
+  
+  // Email format validation
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(payload.email.trim())) {
+    throw new Error("Email không hợp lệ");
+  }
+  
+  // Password validation
+  if (payload.newPassword.length < 6) {
+    throw new Error("Mật khẩu phải có ít nhất 6 ký tự");
+  }
+  
+  // Password matching validation
+  if (payload.newPassword !== payload.confirmPassword) {
+    throw new Error("Mật khẩu xác nhận không khớp");
+  }
+  
+  const requestBody = {
+    email: payload.email.trim(),
+    newPassword: payload.newPassword.trim(),
+    confirmPassword: payload.confirmPassword.trim(),
+    passwordMatching: payload.newPassword === payload.confirmPassword,
+  };
+  
+  const resp = await fetch(`${API_BASE}/renter/password/reset`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(requestBody),
+  });
+  
+  let data: any = {};
+  try {
+    data = await resp.json();
+  } catch {
+    data = {};
+  }
+  
+  if (!resp.ok) {
+    const message = data?.message || resp.statusText || "Không thể đặt lại mật khẩu";
+    throw new Error(`HTTP ${resp.status}: ${message}`);
+  }
+  
+  // Success - API returns 200 with message "Password reset successfully"
+  return;
+}

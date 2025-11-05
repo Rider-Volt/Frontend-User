@@ -68,8 +68,11 @@ export interface CreateBillingRequest {
 export interface RenterBillingResponse {
   id: number;
   renterName: string;
-  vehicleCode: string;
+  vehicleLicensePlate?: string | null;
+  vehicleId?: number | null;
   vehicleModel: string;
+  vehiclePhotoUrl?: string | null;
+  modelId: number;
   stationId: number;
   stationName: string;
   rentedDay: number;
@@ -80,16 +83,23 @@ export interface RenterBillingResponse {
   actualReturnAt?: string | null;
   preImage?: string | null;
   finalImage?: string | null;
+  contractBeforeImage?: string | null;
+  contractAfterImage?: string | null;
   status: BillingStatus;
   totalCost?: number | null;
   note?: string | null;
+  lockExpiredAt?: string | null;
+  paymentExpiredAt?: string | null;
+  currentOrderCode?: number | null;
+  // Legacy field for backward compatibility
+  vehicleCode?: string | null;
 }
 
 export async function createBilling(
   req: CreateBillingRequest
 ): Promise<RenterBillingResponse> {
   const token = requireToken();
-  const resp = await fetch(BASE, {
+  const resp = await fetchWithRetry(BASE, {
     method: "POST",
     headers: authHeaders(token),
     body: JSON.stringify(req),
@@ -103,7 +113,12 @@ export async function createBilling(
         : resp.statusText);
     throw new Error(`HTTP ${resp.status}: ${msg}`);
   }
-  return data as RenterBillingResponse;
+  // Handle case-insensitive API response (totalcost vs totalCost)
+  const response: any = data;
+  if (response.totalcost != null && response.totalCost == null) {
+    response.totalCost = response.totalcost;
+  }
+  return response as RenterBillingResponse;
 }
 
 export async function listMyBillings(
@@ -231,4 +246,32 @@ export async function cancelBilling(
     throw new Error(`HTTP ${resp.status}: ${msg}`);
   }
   return data as RenterBillingResponse;
+}
+
+// PayOS webhook interface
+export interface PayOSWebhookPayload {
+  [key: string]: any;
+}
+
+
+export async function payOSWebhook(
+  payload: PayOSWebhookPayload
+): Promise<Record<string, never>> {
+  const resp = await fetchWithRetry(`${API_BASE}/payments/webhook`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  
+  const data = await resp.json().catch(() => ({}));
+  
+  if (!resp.ok) {
+    const msg =
+      data?.message || resp.statusText || "Webhook processing failed";
+    throw new Error(`HTTP ${resp.status}: ${msg}`);
+  }
+  
+  return (data || {}) as Record<string, never>;
 }

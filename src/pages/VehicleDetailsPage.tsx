@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useParams, useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
@@ -53,6 +53,7 @@ import {
   type DemoPaymentInfo,
   type PayOSPaymentLinkResponse,
   mockMarkPaymentAsPaid,
+  processPayOSPaymentReturn,
 } from "@/services/paymentService";
 import { getCurrentUser, fetchProfileFromAPI } from "@/services/authService";
 // Local minimal type to avoid external import resolution issues
@@ -84,6 +85,7 @@ const VehicleDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const [vehicle, setVehicle] = useState<VehicleData | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [username, setUsername] = useState("");
@@ -125,6 +127,41 @@ const VehicleDetailsPage = () => {
       }
     }
   }, []);
+
+  // Handle PayOS payment return
+  useEffect(() => {
+    const checkPaymentReturn = async () => {
+      // Check if there are query params that might indicate a PayOS return
+      // PayOS typically redirects with query params like code, status, etc.
+      const hasPayOSParams = 
+        searchParams.has("code") || 
+        searchParams.has("status") || 
+        searchParams.has("orderCode") ||
+        searchParams.has("paymentLinkId");
+
+      if (hasPayOSParams) {
+        try {
+          // Pass the query params to the API
+          await processPayOSPaymentReturn(searchParams);
+          toast({
+            title: "Thanh toán thành công",
+            description: "Thanh toán đã được xử lý. Vui lòng kiểm tra trạng thái đơn hàng.",
+          });
+          // Clean up URL by removing query params
+          navigate(location.pathname, { replace: true });
+        } catch (error) {
+          console.error("Error processing payment return:", error);
+          toast({
+            title: "Lỗi xử lý thanh toán",
+            description: error instanceof Error ? error.message : "Không thể xử lý kết quả thanh toán.",
+            variant: "destructive",
+          });
+        }
+      }
+    };
+
+    checkPaymentReturn();
+  }, [searchParams, navigate, location.pathname, toast]);
 
   // Fetch all stations
   useEffect(() => {
@@ -232,7 +269,7 @@ const VehicleDetailsPage = () => {
     inferredType.includes("ô tô") ||
     inferredType.includes("car") ||
     inferredType.includes("suv");
-  // Đã xóa tiền cọc
+
   const depositAmount = 0;
 
   const chargeableDays = rentalDurationDays > 0 ? rentalDurationDays : 0;
@@ -775,7 +812,7 @@ const InfoRow = ({
             {/* Pricing */}
             <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
               <h3 className="text-lg font-semibold mb-6 text-gray-900">
-                <span className="border-b-2 border-green-500 pb-2">Giá & đặt cọc</span>
+                <span className="border-b-2 border-green-500 pb-2">Giá thuê</span>
               </h3>
               <div className="space-y-4">
                 <div className="flex items-center justify-between py-3 px-4 rounded-lg bg-gray-50">
@@ -796,22 +833,10 @@ const InfoRow = ({
                       : "Chưa xác định"}
                   </span>
                 </div>
-                <div className="flex items-center justify-between py-3 px-4 rounded-lg bg-gray-50">
-                  <span className="text-sm text-gray-600">
-                    Đặt cọc bắt buộc
-                  </span>
-                  <span className="font-semibold text-blue-700">
-                    {formatCurrency(depositAmount)}
-                  </span>
-                </div>
                 <div className="mt-4 p-4 rounded-lg bg-blue-50 border border-blue-200">
                   <p className="text-xs text-gray-600 leading-relaxed">
                     Phí thuê được tính theo thời gian thực tế: đơn giá ngày × số
                     ngày (làm tròn lên đến 1 ngày nếu thời gian ≥ 8 giờ).
-                  </p>
-                  <p className="text-xs text-gray-600 leading-relaxed mt-2">
-                    Quy định đặt cọc: ô tô 5.000.000đ, xe máy 1.000.000đ. Mức hiển
-                    thị ở trên áp dụng cho loại xe này.
                   </p>
                 </div>
               </div>
@@ -1107,13 +1132,6 @@ const InfoRow = ({
                       : rentalAmount > 0
                       ? formatCurrency(rentalAmount)
                       : "Chọn thời gian"}
-                  </span>
-                </div>
-                
-                <div className="flex justify-between items-center py-3 px-4 rounded-lg bg-white border border-blue-200">
-                  <span className="text-gray-600 font-medium">Đặt cọc</span>
-                  <span className="font-bold text-blue-700">
-                    {formatCurrency(depositAmount)}
                   </span>
                 </div>
                 

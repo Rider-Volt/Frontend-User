@@ -765,21 +765,6 @@ const Bookings = () => {
                   </div>
                 </div>
               </div>
-              
-              <div className="bg-gray-50 rounded-lg p-4 border border-gray-100">
-                <div className="flex items-start gap-3">
-                  <Clock className="h-5 w-5 flex-shrink-0 text-emerald-600 mt-0.5" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
-                      THỜI GIAN ĐẶT
-                    </p>
-                    <p className="text-sm font-semibold text-gray-900 break-words">
-                      {bookingTime}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
               {days != null && (
                 <div className="bg-gray-50 rounded-lg p-4 border border-gray-100">
                   <div className="flex items-start gap-3">
@@ -795,6 +780,20 @@ const Bookings = () => {
                   </div>
                 </div>
               )}
+
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-100">
+                <div className="flex items-start gap-3">
+                  <Clock className="h-5 w-5 flex-shrink-0 text-emerald-600 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                      THỜI GIAN ĐẶT
+                    </p>
+                    <p className="text-sm font-semibold text-gray-900 break-words">
+                      {bookingTime}
+                    </p>
+                  </div>
+                </div>
+              </div>
 
               {/* Chỉ hiển thị "Nhận xe thực tế" khi đã thực sự check-in (status RENTING hoặc DONE) */}
               {actualPickup !== "—" && (booking.status === "RENTING" || booking.status === "DONE") && (

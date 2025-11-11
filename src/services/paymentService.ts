@@ -138,6 +138,36 @@ export function extractQrCode(
   return undefined;
 }
 
+/**
+ * Read PayOS redirect query params for success
+ * This is a public endpoint that processes PayOS payment return
+ * @param queryParams - URL search params from PayOS redirect (optional, will use current URL if not provided)
+ * @returns Promise that resolves when the payment return is processed
+ */
+export async function processPayOSPaymentReturn(queryParams?: URLSearchParams): Promise<void> {
+  // Build URL with query params
+  let url = `${PAYOS_BASE}/payment/return`;
+  if (queryParams && queryParams.toString()) {
+    url += `?${queryParams.toString()}`;
+  }
+
+  const resp = await fetch(url, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!resp.ok) {
+    const data = await resp.json().catch(() => ({})) as { message?: string; error?: string };
+    const message = data?.message || data?.error || resp.statusText;
+    throw new Error(`Không thể xử lý kết quả thanh toán: ${message}`);
+  }
+
+  // Response is an empty object {} on success
+  await resp.json().catch(() => ({}));
+}
+
 export async function createDemoPaymentInfo(
   options: DemoPaymentOptions
 ): Promise<DemoPaymentInfo> {

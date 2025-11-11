@@ -3,13 +3,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Star, Home, Car, IdCard, Image as ImageIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import Navbar from "../components/heroUi/Navbar";
 import Footer from "../components/heroUi/Footer";
-import { getCurrentUser, refreshCurrentUser, updateUser, LoginResponse } from "@/services/authService";
+import { getCurrentUser, refreshCurrentUser, updateUser, LoginResponse, uploadIdentitySet, getAuthToken } from "@/services/authService";
+import { listIdentitySets, IdentitySet } from "@/services/renterBillingService";
 
 const Profile = () => {
   const [profile, setProfile] = useState<LoginResponse | null>(null);
@@ -20,16 +23,33 @@ const Profile = () => {
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Ảnh giấy tờ
-  const [nationalIdImageFile, setNationalIdImageFile] = useState<File | null>(null);
-  const [nationalIdImagePreview, setNationalIdImagePreview] = useState<string | null>(null);
-  const nationalIdInputRef = useRef<HTMLInputElement | null>(null);
+  // Ảnh giấy tờ - GPLX
+  const [gplxFrontFile, setGplxFrontFile] = useState<File | null>(null);
+  const [gplxFrontPreview, setGplxFrontPreview] = useState<string | null>(null);
+  const gplxFrontInputRef = useRef<HTMLInputElement | null>(null);
+  const [gplxFrontError, setGplxFrontError] = useState(false);
 
-  const [driverLicenseImageFile, setDriverLicenseImageFile] = useState<File | null>(null);
-  const [driverLicenseImagePreview, setDriverLicenseImagePreview] = useState<string | null>(null);
-  const driverLicenseInputRef = useRef<HTMLInputElement | null>(null);
-  const [nationalIdImageError, setNationalIdImageError] = useState(false);
-  const [driverLicenseImageError, setDriverLicenseImageError] = useState(false);
+  const [gplxBackFile, setGplxBackFile] = useState<File | null>(null);
+  const [gplxBackPreview, setGplxBackPreview] = useState<string | null>(null);
+  const gplxBackInputRef = useRef<HTMLInputElement | null>(null);
+  const [gplxBackError, setGplxBackError] = useState(false);
+
+  // Ảnh giấy tờ - CCCD
+  const [cccdFrontFile, setCccdFrontFile] = useState<File | null>(null);
+  const [cccdFrontPreview, setCccdFrontPreview] = useState<string | null>(null);
+  const cccdFrontInputRef = useRef<HTMLInputElement | null>(null);
+  const [cccdFrontError, setCccdFrontError] = useState(false);
+
+  const [cccdBackFile, setCccdBackFile] = useState<File | null>(null);
+  const [cccdBackPreview, setCccdBackPreview] = useState<string | null>(null);
+  const cccdBackInputRef = useRef<HTMLInputElement | null>(null);
+  const [cccdBackError, setCccdBackError] = useState(false);
+
+  // Identity sets từ API
+  const [identitySets, setIdentitySets] = useState<IdentitySet[]>([]);
+  const [loadingIdentitySets, setLoadingIdentitySets] = useState(false);
+  
+  const [note, setNote] = useState("");
 
   const [editData, setEditData] = useState({
     full_name: "",
@@ -49,20 +69,38 @@ const Profile = () => {
     }
   };
 
-  const clearNationalIdSelection = () => {
-    if (nationalIdImagePreview) URL.revokeObjectURL(nationalIdImagePreview);
-    setNationalIdImageFile(null);
-    setNationalIdImagePreview(null);
-    if (nationalIdInputRef.current) nationalIdInputRef.current.value = "";
-    setNationalIdImageError(false);
+  // Clear functions cho GPLX
+  const clearGplxFrontSelection = () => {
+    if (gplxFrontPreview) URL.revokeObjectURL(gplxFrontPreview);
+    setGplxFrontFile(null);
+    setGplxFrontPreview(null);
+    if (gplxFrontInputRef.current) gplxFrontInputRef.current.value = "";
+    setGplxFrontError(false);
   };
 
-  const clearDriverLicenseSelection = () => {
-    if (driverLicenseImagePreview) URL.revokeObjectURL(driverLicenseImagePreview);
-    setDriverLicenseImageFile(null);
-    setDriverLicenseImagePreview(null);
-    if (driverLicenseInputRef.current) driverLicenseInputRef.current.value = "";
-    setDriverLicenseImageError(false);
+  const clearGplxBackSelection = () => {
+    if (gplxBackPreview) URL.revokeObjectURL(gplxBackPreview);
+    setGplxBackFile(null);
+    setGplxBackPreview(null);
+    if (gplxBackInputRef.current) gplxBackInputRef.current.value = "";
+    setGplxBackError(false);
+  };
+
+  // Clear functions cho CCCD
+  const clearCccdFrontSelection = () => {
+    if (cccdFrontPreview) URL.revokeObjectURL(cccdFrontPreview);
+    setCccdFrontFile(null);
+    setCccdFrontPreview(null);
+    if (cccdFrontInputRef.current) cccdFrontInputRef.current.value = "";
+    setCccdFrontError(false);
+  };
+
+  const clearCccdBackSelection = () => {
+    if (cccdBackPreview) URL.revokeObjectURL(cccdBackPreview);
+    setCccdBackFile(null);
+    setCccdBackPreview(null);
+    if (cccdBackInputRef.current) cccdBackInputRef.current.value = "";
+    setCccdBackError(false);
   };
 
   const handleAvatarChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -80,23 +118,47 @@ const Profile = () => {
     });
   };
 
-  const handleNationalIdChange = (event: ChangeEvent<HTMLInputElement>) => {
+  // Handlers cho GPLX
+  const handleGplxFrontChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return clearNationalIdSelection();
-    setNationalIdImageFile(file);
-    setNationalIdImageError(false);
-    setNationalIdImagePreview((prev) => {
+    if (!file) return clearGplxFrontSelection();
+    setGplxFrontFile(file);
+    setGplxFrontError(false);
+    setGplxFrontPreview((prev) => {
       if (prev) URL.revokeObjectURL(prev);
       return URL.createObjectURL(file);
     });
   };
 
-  const handleDriverLicenseChange = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleGplxBackChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return clearDriverLicenseSelection();
-    setDriverLicenseImageFile(file);
-    setDriverLicenseImageError(false);
-    setDriverLicenseImagePreview((prev) => {
+    if (!file) return clearGplxBackSelection();
+    setGplxBackFile(file);
+    setGplxBackError(false);
+    setGplxBackPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return URL.createObjectURL(file);
+    });
+  };
+
+  // Handlers cho CCCD
+  const handleCccdFrontChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return clearCccdFrontSelection();
+    setCccdFrontFile(file);
+    setCccdFrontError(false);
+    setCccdFrontPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return URL.createObjectURL(file);
+    });
+  };
+
+  const handleCccdBackChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return clearCccdBackSelection();
+    setCccdBackFile(file);
+    setCccdBackError(false);
+    setCccdBackPreview((prev) => {
       if (prev) URL.revokeObjectURL(prev);
       return URL.createObjectURL(file);
     });
@@ -142,15 +204,58 @@ const Profile = () => {
     };
   }, []);
 
+  // Load identity sets
+  useEffect(() => {
+    if (!profile) return;
+    let active = true;
+    (async () => {
+      try {
+        setLoadingIdentitySets(true);
+        const sets = await listIdentitySets();
+        if (!active) return;
+        setIdentitySets(sets);
+        // Tự động load ảnh từ identity set mới nhất nếu có
+        if (sets.length > 0) {
+          const latestSet = sets[0];
+          if (latestSet.assets && latestSet.assets.length > 0) {
+            const cccdFront = latestSet.assets.find(a => a.type === "CCCD_FRONT");
+            const cccdBack = latestSet.assets.find(a => a.type === "CCCD_BACK");
+            const gplxFront = latestSet.assets.find(a => a.type === "GPLX_FRONT");
+            const gplxBack = latestSet.assets.find(a => a.type === "GPLX_BACK");
+            
+            // Cập nhật profile với URL từ identity set
+            if (cccdFront && !profile.nationalIdImageUrl) {
+              setProfile({ ...profile, nationalIdImageUrl: cccdFront.url });
+            }
+            if (gplxFront && !profile.driverLicenseImageUrl) {
+              setProfile({ ...profile, driverLicenseImageUrl: gplxFront.url });
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Không thể tải danh sách giấy tờ", err);
+      } finally {
+        if (active) {
+          setLoadingIdentitySets(false);
+        }
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [profile]);
+
   useEffect(
     () => () => {
       if (avatarPreview) {
         URL.revokeObjectURL(avatarPreview);
       }
-      if (nationalIdImagePreview) URL.revokeObjectURL(nationalIdImagePreview);
-      if (driverLicenseImagePreview) URL.revokeObjectURL(driverLicenseImagePreview);
+      if (gplxFrontPreview) URL.revokeObjectURL(gplxFrontPreview);
+      if (gplxBackPreview) URL.revokeObjectURL(gplxBackPreview);
+      if (cccdFrontPreview) URL.revokeObjectURL(cccdFrontPreview);
+      if (cccdBackPreview) URL.revokeObjectURL(cccdBackPreview);
     },
-    [avatarPreview, nationalIdImagePreview, driverLicenseImagePreview]
+    [avatarPreview, gplxFrontPreview, gplxBackPreview, cccdFrontPreview, cccdBackPreview]
   );
 
   const getInitials = (name: string) =>
@@ -169,14 +274,105 @@ const Profile = () => {
     if (!profile) return;
     setSaving(true);
     try {
+      const token = getAuthToken();
+      if (!token) {
+        throw new Error("Bạn cần đăng nhập để cập nhật");
+      }
+
+      // Upload identity set nếu có file giấy tờ
+      // Upload GPLX mặt trước
+      if (gplxFrontFile) {
+        try {
+          await uploadIdentitySet(
+            {
+              gplxFile: gplxFrontFile,
+              gplxSide: "front",
+            },
+            token
+          );
+        } catch (err: any) {
+          console.warn("Lỗi upload GPLX mặt trước:", err);
+        }
+      }
+
+      // Upload GPLX mặt sau
+      if (gplxBackFile) {
+        try {
+          await uploadIdentitySet(
+            {
+              gplxFile: gplxBackFile,
+              gplxSide: "back",
+            },
+            token
+          );
+        } catch (err: any) {
+          console.warn("Lỗi upload GPLX mặt sau:", err);
+        }
+      }
+
+      // Upload CCCD mặt trước
+      if (cccdFrontFile) {
+        try {
+          await uploadIdentitySet(
+            {
+              cccdFile: cccdFrontFile,
+              cccdSide: "front",
+            },
+            token
+          );
+        } catch (err: any) {
+          console.warn("Lỗi upload CCCD mặt trước:", err);
+        }
+      }
+
+      // Upload CCCD mặt sau
+      if (cccdBackFile) {
+        try {
+          await uploadIdentitySet(
+            {
+              cccdFile: cccdBackFile,
+              cccdSide: "back",
+            },
+            token
+          );
+        } catch (err: any) {
+          console.warn("Lỗi upload CCCD mặt sau:", err);
+        }
+      }
+
+      // Upload note nếu có
+      if (note && (gplxFrontFile || gplxBackFile || cccdFrontFile || cccdBackFile)) {
+        try {
+          // Note có thể được gửi kèm với lần upload cuối cùng
+          await uploadIdentitySet(
+            {
+              note: note,
+            },
+            token
+          );
+        } catch (err: any) {
+          console.warn("Lỗi upload ghi chú:", err);
+        }
+      }
+
+      // Reload identity sets sau khi upload thành công
+      if (gplxFrontFile || gplxBackFile || cccdFrontFile || cccdBackFile) {
+        try {
+          const sets = await listIdentitySets();
+          setIdentitySets(sets);
+        } catch (err: any) {
+          console.warn("Lỗi reload identity sets:", err);
+        }
+      }
+
+      // Cập nhật thông tin profile
       const updated = await updateUser({
         full_name: editData.full_name,
         email: editData.email,
         phone: editData.phone,
         address: editData.address,
         avatarFile,
-        nationalIdImageFile,
-        driverLicenseImageFile,
+        // Không truyền giấy tờ vào updateUser nữa vì đã upload riêng
       });
       setProfile(updated);
       setEditData({
@@ -187,8 +383,11 @@ const Profile = () => {
       });
       setIsEditing(false);
       clearAvatarSelection();
-      clearNationalIdSelection();
-      clearDriverLicenseSelection();
+      clearGplxFrontSelection();
+      clearGplxBackSelection();
+      clearCccdFrontSelection();
+      clearCccdBackSelection();
+      setNote("");
       alert("✅ Cập nhật thành công");
     } catch (err: any) {
       alert(err?.message || "❌ Cập nhật thất bại");
@@ -206,6 +405,10 @@ const Profile = () => {
       address: profile.address || "",
     });
     clearAvatarSelection();
+    clearGplxFrontSelection();
+    clearGplxBackSelection();
+    clearCccdFrontSelection();
+    clearCccdBackSelection();
     setIsEditing(false);
   };
 
@@ -468,123 +671,300 @@ const Profile = () => {
 
             {/* Removed general warning note per request */}
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <div>
-                  <Label className="text-sm font-medium text-gray-700 mb-1 block">Ảnh GPLX</Label>
-                  <div className="border-2 border-dashed border-gray-300 bg-gray-50 rounded-2xl flex flex-col items-center justify-center min-h-[200px] p-6 text-gray-500 text-sm">
-                    {(driverLicenseImagePreview || (profile.driverLicenseImageUrl && !driverLicenseImageError)) ? (
-                      <img
-                        src={driverLicenseImagePreview || profile.driverLicenseImageUrl!}
-                        alt="Ảnh GPLX"
-                        className="max-h-48 object-contain rounded shadow-sm"
-                        onError={() => setDriverLicenseImageError(true)}
-                      />
-                    ) : (
-                      <>
-                        <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mb-3">
-                          <ImageIcon className="w-6 h-6 text-green-500" />
-                        </div>
-                        <p>Tải ảnh GPLX của bạn</p>
-                      </>
+            {/* Ảnh GPLX - Mặt trước và Mặt sau */}
+            <div className="space-y-6">
+              <div>
+                <Label className="text-lg font-semibold text-gray-900 mb-4 block">Ảnh GPLX</Label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* GPLX Mặt trước */}
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium text-gray-700">Mặt trước GPLX</Label>
+                    <div className="border-2 border-dashed border-gray-300 bg-gray-50 rounded-2xl flex flex-col items-center justify-center min-h-[200px] p-6 text-gray-500 text-sm">
+                      {gplxFrontPreview ? (
+                        <img
+                          src={gplxFrontPreview}
+                          alt="GPLX Mặt trước"
+                          className="max-h-48 object-contain rounded shadow-sm"
+                        />
+                      ) : (
+                        <>
+                          <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mb-3">
+                            <ImageIcon className="w-6 h-6 text-green-500" />
+                          </div>
+                          <p>Chưa có ảnh mặt trước</p>
+                        </>
+                      )}
+                    </div>
+                    {isEditing && (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <input
+                          ref={gplxFrontInputRef}
+                          type="file"
+                          accept="image/png,image/jpeg"
+                          className="hidden"
+                          onChange={handleGplxFrontChange}
+                          disabled={!isEditing || saving}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => gplxFrontInputRef.current?.click()}
+                          disabled={!isEditing || saving}
+                          className="border-gray-300 text-gray-700 hover:bg-green-50 hover:border-green-300 hover:text-green-700"
+                        >
+                          <Car className="w-4 h-4 mr-2" />
+                          Chọn ảnh mặt trước
+                        </Button>
+                        {gplxFrontFile && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={clearGplxFrontSelection}
+                            disabled={saving}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            Bỏ chọn
+                          </Button>
+                        )}
+                      </div>
                     )}
                   </div>
-                </div>
 
-                <div className="flex flex-wrap items-center gap-2 mt-3">
-                  <input
-                      ref={driverLicenseInputRef}
-                      type="file"
-                      accept="image/png,image/jpeg"
-                      className="hidden"
-                      onChange={handleDriverLicenseChange}
-                      disabled={!isEditing || saving}
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => driverLicenseInputRef.current?.click()}
-                      disabled={!isEditing || saving}
-                      className="border-gray-300 text-gray-700 hover:bg-green-50 hover:border-green-300 hover:text-green-700"
-                    >
-                      <Car className="w-4 h-4 mr-2" />
-                      Chọn ảnh GPLX
-                    </Button>
-                    {driverLicenseImageFile && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        onClick={clearDriverLicenseSelection}
-                        disabled={saving}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        Bỏ chọn
-                      </Button>
+                  {/* GPLX Mặt sau */}
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium text-gray-700">Mặt sau GPLX</Label>
+                    <div className="border-2 border-dashed border-gray-300 bg-gray-50 rounded-2xl flex flex-col items-center justify-center min-h-[200px] p-6 text-gray-500 text-sm">
+                      {gplxBackPreview ? (
+                        <img
+                          src={gplxBackPreview}
+                          alt="GPLX Mặt sau"
+                          className="max-h-48 object-contain rounded shadow-sm"
+                        />
+                      ) : (
+                        <>
+                          <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mb-3">
+                            <ImageIcon className="w-6 h-6 text-green-500" />
+                          </div>
+                          <p>Chưa có ảnh mặt sau</p>
+                        </>
+                      )}
+                    </div>
+                    {isEditing && (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <input
+                          ref={gplxBackInputRef}
+                          type="file"
+                          accept="image/png,image/jpeg"
+                          className="hidden"
+                          onChange={handleGplxBackChange}
+                          disabled={!isEditing || saving}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => gplxBackInputRef.current?.click()}
+                          disabled={!isEditing || saving}
+                          className="border-gray-300 text-gray-700 hover:bg-green-50 hover:border-green-300 hover:text-green-700"
+                        >
+                          <Car className="w-4 h-4 mr-2" />
+                          Chọn ảnh mặt sau
+                        </Button>
+                        {gplxBackFile && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={clearGplxBackSelection}
+                            disabled={saving}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            Bỏ chọn
+                          </Button>
+                        )}
+                      </div>
                     )}
+                  </div>
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <div>
-                  <Label className="text-sm font-medium text-gray-700 mb-1 block">Ảnh CCCD</Label>
-                  <div className="border-2 border-dashed border-gray-300 bg-gray-50 rounded-2xl flex flex-col items-center justify-center min-h-[200px] p-6 text-gray-500 text-sm">
-                    {(nationalIdImagePreview || (profile.nationalIdImageUrl && !nationalIdImageError)) ? (
-                      <img
-                        src={nationalIdImagePreview || profile.nationalIdImageUrl!}
-                        alt="Ảnh CCCD"
-                        className="max-h-48 object-contain rounded shadow-sm"
-                        onError={() => setNationalIdImageError(true)}
-                      />
-                    ) : (
-                      <>
-                        <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mb-3">
-                          <ImageIcon className="w-6 h-6 text-green-500" />
-                        </div>
-                        <p>Chưa có ảnh CCCD</p>
-                      </>
+              <Separator />
+
+              {/* Ảnh CCCD - Mặt trước và Mặt sau */}
+              <div>
+                <Label className="text-lg font-semibold text-gray-900 mb-4 block">Ảnh CCCD</Label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* CCCD Mặt trước */}
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium text-gray-700">Mặt trước CCCD</Label>
+                    <div className="border-2 border-dashed border-gray-300 bg-gray-50 rounded-2xl flex flex-col items-center justify-center min-h-[200px] p-6 text-gray-500 text-sm">
+                      {cccdFrontPreview ? (
+                        <img
+                          src={cccdFrontPreview}
+                          alt="CCCD Mặt trước"
+                          className="max-h-48 object-contain rounded shadow-sm"
+                        />
+                      ) : (
+                        <>
+                          <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mb-3">
+                            <ImageIcon className="w-6 h-6 text-green-500" />
+                          </div>
+                          <p>Chưa có ảnh mặt trước</p>
+                        </>
+                      )}
+                    </div>
+                    {isEditing && (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <input
+                          ref={cccdFrontInputRef}
+                          type="file"
+                          accept="image/png,image/jpeg"
+                          className="hidden"
+                          onChange={handleCccdFrontChange}
+                          disabled={!isEditing || saving}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => cccdFrontInputRef.current?.click()}
+                          disabled={!isEditing || saving}
+                          className="border-gray-300 text-gray-700 hover:bg-green-50 hover:border-green-300 hover:text-green-700"
+                        >
+                          <IdCard className="w-4 h-4 mr-2" />
+                          Chọn ảnh mặt trước
+                        </Button>
+                        {cccdFrontFile && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={clearCccdFrontSelection}
+                            disabled={saving}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            Bỏ chọn
+                          </Button>
+                        )}
+                      </div>
                     )}
                   </div>
-                  <div className="flex flex-wrap items-center gap-2 mt-3">
-                    <input
-                      ref={nationalIdInputRef}
-                      type="file"
-                      accept="image/png,image/jpeg"
-                      className="hidden"
-                      onChange={handleNationalIdChange}
-                      disabled={!isEditing || saving}
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => nationalIdInputRef.current?.click()}
-                      disabled={!isEditing || saving}
-                      className="border-gray-300 text-gray-700 hover:bg-green-50 hover:border-green-300 hover:text-green-700"
-                    >
-                      <IdCard className="w-4 h-4 mr-2" />
-                      Chọn ảnh CCCD
-                    </Button>
-                    {nationalIdImageFile && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        onClick={clearNationalIdSelection}
-                        disabled={saving}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        Bỏ chọn
-                      </Button>
+
+                  {/* CCCD Mặt sau */}
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium text-gray-700">Mặt sau CCCD</Label>
+                    <div className="border-2 border-dashed border-gray-300 bg-gray-50 rounded-2xl flex flex-col items-center justify-center min-h-[200px] p-6 text-gray-500 text-sm">
+                      {cccdBackPreview ? (
+                        <img
+                          src={cccdBackPreview}
+                          alt="CCCD Mặt sau"
+                          className="max-h-48 object-contain rounded shadow-sm"
+                        />
+                      ) : (
+                        <>
+                          <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mb-3">
+                            <ImageIcon className="w-6 h-6 text-green-500" />
+                          </div>
+                          <p>Chưa có ảnh mặt sau</p>
+                        </>
+                      )}
+                    </div>
+                    {isEditing && (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <input
+                          ref={cccdBackInputRef}
+                          type="file"
+                          accept="image/png,image/jpeg"
+                          className="hidden"
+                          onChange={handleCccdBackChange}
+                          disabled={!isEditing || saving}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => cccdBackInputRef.current?.click()}
+                          disabled={!isEditing || saving}
+                          className="border-gray-300 text-gray-700 hover:bg-green-50 hover:border-green-300 hover:text-green-700"
+                        >
+                          <IdCard className="w-4 h-4 mr-2" />
+                          Chọn ảnh mặt sau
+                        </Button>
+                        {cccdBackFile && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={clearCccdBackSelection}
+                            disabled={saving}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            Bỏ chọn
+                          </Button>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
-
-                <Separator />
-
-               
               </div>
+
+              <Separator />
+
+                {isEditing && (
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-gray-700">Ghi chú (tùy chọn)</Label>
+                    <Textarea
+                      value={note}
+                      onChange={(e) => setNote(e.target.value)}
+                      placeholder="Nhập ghi chú nếu có..."
+                      disabled={saving}
+                      className="min-h-[80px] border-gray-300 focus:border-green-500 focus:ring-green-500"
+                    />
+                  </div>
+                )}
+
+                {/* Hiển thị danh sách identity sets */}
+                {identitySets.length > 0 && (
+                  <div className="space-y-2 mt-4">
+                    <Label className="text-sm font-medium text-gray-700">Lịch sử giấy tờ đã nộp</Label>
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {identitySets.map((set) => (
+                        <div key={set.id} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm font-medium text-gray-700">
+                              Bộ giấy tờ #{set.id}
+                            </span>
+                            {set.status && (
+                              <span
+                                className={`text-xs px-2 py-1 rounded-full ${
+                                  set.status === "APPROVED"
+                                    ? "bg-green-100 text-green-700"
+                                    : set.status === "REJECTED"
+                                    ? "bg-red-100 text-red-700"
+                                    : "bg-yellow-100 text-yellow-700"
+                                }`}
+                              >
+                                {set.status === "APPROVED"
+                                  ? "Đã duyệt"
+                                  : set.status === "REJECTED"
+                                  ? "Từ chối"
+                                  : "Chờ duyệt"}
+                              </span>
+                            )}
+                          </div>
+                          {set.note && (
+                            <p className="text-xs text-gray-600 mt-1">{set.note}</p>
+                          )}
+                          {set.reviewNote && (
+                            <p className="text-xs text-red-600 mt-1">Ghi chú: {set.reviewNote}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
             </div>
           </div>
         </div>

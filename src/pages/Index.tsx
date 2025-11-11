@@ -6,7 +6,7 @@ import EVCard from "../components/heroUi/EVCard";
 import { useNavigate } from "react-router-dom";
 import { groupCarsByType } from "@/services/carServices";
 import { VehicleData } from "@/types/vehicle";
-import { fetchVehiclesLimited } from "@/services/vehicleService";
+import { fetchVehiclesLimited, clearVehicleServiceCache } from "@/services/vehicleService";
 
 const Index: React.FC = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -38,7 +38,10 @@ const Index: React.FC = () => {
 
   useEffect(() => {
     let cancelled = false;
-    const loadVehicles = async () => {
+    const loadVehicles = async (forceRefresh = false) => {
+      if (forceRefresh) {
+        clearVehicleServiceCache();
+      }
       setLoadingVehicles(true);
       setVehiclesError(null);
       try {
@@ -56,9 +59,29 @@ const Index: React.FC = () => {
         }
       }
     };
+
+    // Load vehicles on mount
     loadVehicles();
+
+    // Refresh when window regains focus (user switches back to tab)
+    const handleFocus = () => {
+      if (!cancelled) {
+        loadVehicles(true);
+      }
+    };
+    window.addEventListener("focus", handleFocus);
+
+    // Periodic polling every 30 seconds to check for updates
+    const pollInterval = setInterval(() => {
+      if (!cancelled && document.visibilityState === "visible") {
+        loadVehicles(true);
+      }
+    }, 30000); // 30 seconds
+
     return () => {
       cancelled = true;
+      window.removeEventListener("focus", handleFocus);
+      clearInterval(pollInterval);
     };
   }, []);
 

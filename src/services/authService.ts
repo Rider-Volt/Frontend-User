@@ -382,6 +382,66 @@ export function getCurrentUserId(): number | undefined {
   return fromJwt;
 }
 
+// Upload identity set (CCCD và GPLX cùng lúc)
+export interface UploadIdentitySetParams {
+  cccdFile?: File | null;
+  gplxFile?: File | null;
+  cccdSide?: "front" | "back";
+  gplxSide?: "front" | "back";
+  note?: string;
+}
+
+export async function uploadIdentitySet(
+  params: UploadIdentitySetParams,
+  token: string
+): Promise<any> {
+  const form = new FormData();
+  
+  if (params.cccdFile instanceof File) {
+    form.append("cccd", params.cccdFile);
+  }
+  
+  if (params.gplxFile instanceof File) {
+    form.append("gplx", params.gplxFile);
+  }
+
+  // Build query parameters
+  const queryParams = new URLSearchParams();
+  if (params.cccdSide) {
+    queryParams.append("cccdSide", params.cccdSide);
+  }
+  if (params.gplxSide) {
+    queryParams.append("gplxSide", params.gplxSide);
+  }
+  if (params.note) {
+    queryParams.append("note", params.note);
+  }
+
+  const url = `${API_BASE}/renter/identity-sets${queryParams.toString() ? `?${queryParams.toString()}` : ""}`;
+  
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: authHeaders(token, null),
+    body: form,
+  });
+
+  let data: any = {};
+  try {
+    data = await resp.json();
+  } catch {
+    data = {};
+  }
+
+  if (!resp.ok) {
+    const message =
+      (typeof data?.message === "string" && data.message) ||
+      "Không thể upload giấy tờ";
+    throw new Error(message);
+  }
+
+  return data;
+}
+
 async function uploadIdentityDocument(
   field: "cccd" | "gplx",
   file: File,
@@ -478,24 +538,56 @@ export async function updateUser(userPatch: UpdateUserPayload): Promise<LoginRes
     nextState = mergeProfileOnly(current, data as RenterProfileApiResponse);
   }
 
-  // Upload CCCD nếu cần
-  if (userPatch.nationalIdImageFile instanceof File) {
-    const profileAfterCccd = await uploadIdentityDocument(
-      "cccd",
-      userPatch.nationalIdImageFile,
-      token
-    );
-    nextState = mergeProfileOnly(nextState, profileAfterCccd);
-  }
+  // Upload identity documents - ưu tiên sử dụng API mới nếu có cả hai file
+  const hasCccd = userPatch.nationalIdImageFile instanceof File;
+  const hasGplx = userPatch.driverLicenseImageFile instanceof File;
 
-  // Upload GPLX nếu cần
-  if (userPatch.driverLicenseImageFile instanceof File) {
-    const profileAfterGplx = await uploadIdentityDocument(
-      "gplx",
-      userPatch.driverLicenseImageFile,
-      token
-    );
-    nextState = mergeProfileOnly(nextState, profileAfterGplx);
+  if (hasCccd && hasGplx) {
+    // Upload cả hai cùng lúc bằng API mới
+    try {
+      await uploadIdentitySet(
+        {
+          cccdFile: userPatch.nationalIdImageFile,
+          gplxFile: userPatch.driverLicenseImageFile,
+          cccdSide: "front", // Mặc định là mặt trước
+          gplxSide: "front", // Mặc định là mặt trước
+        },
+        token
+      );
+      // Refresh profile sau khi upload thành công
+      const refreshed = await fetchRenterMe(token);
+      nextState = mergeProfileOnly(nextState, refreshed);
+    } catch (err) {
+      console.warn("Không thể upload identity set, thử upload riêng lẻ:", err);
+      // Fallback: upload riêng lẻ nếu API mới thất bại
+      if (hasCccd) {
+        const profileAfterCccd = await uploadIdentityDocument("cccd", userPatch.nationalIdImageFile!, token);
+        nextState = mergeProfileOnly(nextState, profileAfterCccd);
+      }
+      if (hasGplx) {
+        const profileAfterGplx = await uploadIdentityDocument("gplx", userPatch.driverLicenseImageFile!, token);
+        nextState = mergeProfileOnly(nextState, profileAfterGplx);
+      }
+    }
+  } else {
+    // Upload riêng lẻ nếu chỉ có một file
+    if (hasCccd) {
+      const profileAfterCccd = await uploadIdentityDocument(
+        "cccd",
+        userPatch.nationalIdImageFile!,
+        token
+      );
+      nextState = mergeProfileOnly(nextState, profileAfterCccd);
+    }
+
+    if (hasGplx) {
+      const profileAfterGplx = await uploadIdentityDocument(
+        "gplx",
+        userPatch.driverLicenseImageFile!,
+        token
+      );
+      nextState = mergeProfileOnly(nextState, profileAfterGplx);
+    }
   }
 
   // Các trường chỉ lưu local (address, licenseNumber, nationalId) vì BE chưa hỗ trợ

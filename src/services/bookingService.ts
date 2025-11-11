@@ -54,17 +54,24 @@ function normalizeStored(entry: StoredBooking): StoredBooking {
   };
   const statusCandidate = entry.status as BillingStatus | string | undefined;
   const statusMap: Record<string, BillingStatus> = {
-    PENDING: "WAITING",
-    APPROVED: "PAYED",
-    COMPLETED: "DONE",
-    DENIED: "CANCELLED",
-    CANCELLED: "CANCELLED",
+    WAITING: "PENDING", // Legacy mapping
+    PAYED: "PAID", // Legacy mapping
+    RENTING: "IN_PROGRESS", // Legacy mapping
+    DONE: "RETURNED", // Legacy mapping
+    CANCELLED: "CANCELED", // Legacy mapping
+    PENDING: "PENDING",
+    LOCKED: "LOCKED",
+    PAID: "PAID",
+    IN_PROGRESS: "IN_PROGRESS",
+    RETURNED: "RETURNED",
+    CANCELED: "CANCELED",
+    EXPIRED: "EXPIRED",
   };
   const normalStatus =
     typeof statusCandidate === "string" &&
     (BookingStatuses as readonly string[]).includes(statusCandidate)
       ? (statusCandidate as BillingStatus)
-      : statusMap[String(statusCandidate).toUpperCase()] || "WAITING";
+      : statusMap[String(statusCandidate).toUpperCase()] || "PENDING";
   // Support both old format (startDay/endDay) and new format (plannedStartDate/plannedEndDate)
   const startDay = (entry as any).startDay ?? (entry as any).plannedStartDate ?? legacy.startTime ?? "";
   const endDay = (entry as any).endDay ?? (entry as any).plannedEndDate ?? legacy.endTime ?? "";
@@ -140,9 +147,11 @@ export function clearBookingHistory(userId?: number) {
 }
 
 export const BookingStatuses: BillingStatus[] = [
-  "WAITING",
-  "PAYED",
-  "RENTING",
-  "DONE",
-  "CANCELLED",
+  "PENDING",
+  "LOCKED",
+  "PAID",
+  "IN_PROGRESS",
+  "RETURNED",
+  "CANCELED",
+  "EXPIRED",
 ];

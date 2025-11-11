@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useParams, useNavigate, useLocation, useSearchParams } from "react-router-dom";
+import { useParams, useNavigate, useLocation, useSearchParams, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
@@ -29,6 +29,7 @@ import {
   Phone,
   ChevronLeft,
   ChevronRight,
+  IdCard,
 } from "lucide-react";
 import { differenceInCalendarDays, format, addDays } from "date-fns";
 import { vi } from "date-fns/locale";
@@ -44,7 +45,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { appendBookingHistory, StoredBooking } from "@/services/bookingService";
-import { createBilling } from "@/services/renterBillingService";
+import { createBilling, listIdentitySets, type IdentitySet } from "@/services/renterBillingService";
 import {
   createDemoPaymentInfo,
   createPayOSPaymentLink,
@@ -102,6 +103,11 @@ const VehicleDetailsPage = () => {
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [isBooking, setIsBooking] = useState(false);
   const [actualRentalAmount, setActualRentalAmount] = useState<number | null>(null);
+  
+  // Identity set state
+  const [identitySets, setIdentitySets] = useState<IdentitySet[]>([]);
+  const [selectedIdentitySetId, setSelectedIdentitySetId] = useState<number | null>(null);
+  const [loadingIdentitySets, setLoadingIdentitySets] = useState(false);
 
   // Modal state
   const [showInsuranceModal, setShowInsuranceModal] = useState(false);
@@ -192,6 +198,40 @@ const VehicleDetailsPage = () => {
       cancelled = true;
     };
   }, []);
+
+  // Fetch identity sets when user is logged in
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    
+    let cancelled = false;
+    const loadIdentitySets = async () => {
+      setLoadingIdentitySets(true);
+      try {
+        const data = await listIdentitySets();
+        if (!cancelled) {
+          setIdentitySets(data);
+          // Auto-select first identity set if available and none is selected
+          if (data.length > 0 && selectedIdentitySetId === null) {
+            setSelectedIdentitySetId(data[0].id);
+          }
+        }
+      } catch (err) {
+        console.error("Error loading identity sets:", err);
+        if (!cancelled) {
+          setIdentitySets([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingIdentitySets(false);
+        }
+      }
+    };
+    loadIdentitySets();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoggedIn]);
 
   // Reset actual rental amount when dates change
   useEffect(() => {
@@ -498,11 +538,22 @@ const InfoRow = ({
 
     // Many BE validators expect date-only strings (yyyy-MM-dd) for booking windows
     const toDateOnly = (date: Date) => format(date, "yyyy-MM-dd");
+    if (!selectedIdentitySetId) {
+      toast({
+        title: "Vui lòng chọn giấy tờ",
+        description: "Bạn cần chọn CCCD/GPLX để đặt xe.",
+        variant: "destructive",
+      });
+      setIsBooking(false);
+      return;
+    }
+
     const payload = {
       modelId: vehicle.id,
       stationId: selectedStationId ?? (vehicle.stationId || 1),
       plannedStartDate: toDateOnly(startDate),
       plannedEndDate: toDateOnly(endDate),
+      identitySetId: selectedIdentitySetId,
     };
 
     setIsBooking(true);
@@ -519,25 +570,51 @@ const InfoRow = ({
         ...billing,
         bookingId: billing.id,
         totalCost: billing.totalCost ?? effectiveRentalAmount,
-  // Đã xóa tiền cọc
         totalCharge,
         localVehicleName: vehicle.name,
         localVehicleImage: vehicle.image || vehicle.imageUrl || "",
-        // Pickup method/payment method removed from UI; implied defaults
       };
 
       appendBookingHistory(userId, storedEntry);
 
-      // Luôn sử dụng VietQR với thông tin ngân hàng của bạn
-      try {
-        const info = await createDemoPaymentInfo({
-          billingId: billing.id,
-          amount: totalCharge,
-        });
-        setPaymentInfo(info);
-      } catch (demoErr) {
+      // Ưu tiên sử dụng paymentInfo từ billing response (PayOS)
+      if (billing.paymentInfo) {
+        // Convert expiredAt from ISO string to epoch seconds if needed
+        let expiredAt: number | undefined;
+        if (billing.paymentInfo.expiredAt) {
+          const date = new Date(billing.paymentInfo.expiredAt);
+          expiredAt = isNaN(date.getTime()) ? undefined : Math.floor(date.getTime() / 1000);
+        }
         
-        navigate("/bookings");
+        const payOsData = {
+          billingId: billing.id,
+          payload: {
+            paymentLinkId: billing.paymentInfo.paymentLinkId || undefined,
+            orderCode: billing.paymentInfo.orderCode || undefined,
+            amount: billing.paymentInfo.amount || totalCharge,
+            description: billing.paymentInfo.description || undefined,
+            status: billing.paymentInfo.status || undefined,
+            checkoutUrl: billing.paymentInfo.checkoutUrl || undefined,
+            qrCode: billing.paymentInfo.qrCode || undefined,
+            currency: billing.paymentInfo.currency || undefined,
+            expiredAt: expiredAt,
+          } as PayOSPaymentLinkResponse,
+          checkoutUrl: billing.paymentInfo.checkoutUrl || undefined,
+          qrUrl: billing.paymentInfo.qrCode || undefined,
+        };
+        setPayOsPayment(payOsData);
+      } else {
+        // Fallback: Sử dụng VietQR với thông tin ngân hàng nếu không có PayOS
+        try {
+          const info = await createDemoPaymentInfo({
+            billingId: billing.id,
+            amount: totalCharge,
+          });
+          setPaymentInfo(info);
+        } catch (demoErr) {
+          console.error("Error creating demo payment info:", demoErr);
+          navigate("/bookings");
+        }
       }
     } catch (error) {
       const message =
@@ -990,6 +1067,100 @@ const InfoRow = ({
                   )}
                 </div>
               </div>
+
+              {/* Identity Set selection */}
+              {isLoggedIn && (
+                <div className="mt-6">
+                  <div className="flex items-center gap-2 mb-2">
+                    <IdCard className="w-5 h-5 text-green-600" />
+                    <h4 className="text-base font-semibold text-gray-900">Chọn giấy tờ (CCCD/GPLX)</h4>
+                    {loadingIdentitySets && (
+                      <span className="text-xs text-gray-500">Đang tải…</span>
+                    )}
+                  </div>
+
+                  <div className="grid gap-3">
+                    <Select
+                      value={selectedIdentitySetId != null ? String(selectedIdentitySetId) : undefined}
+                      onValueChange={(v) => setSelectedIdentitySetId(Number(v))}
+                      disabled={loadingIdentitySets || identitySets.length === 0}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Chọn CCCD/GPLX" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {identitySets.map((identitySet) => {
+                          const statusText = identitySet.status === "PENDING" ? "Chờ duyệt" :
+                                            identitySet.status === "APPROVED" ? "Đã duyệt" :
+                                            identitySet.status === "REJECTED" ? "Từ chối" :
+                                            identitySet.status || "";
+                          const displayText = [
+                            identitySet.cccdNumber && `CCCD: ${identitySet.cccdNumber}`,
+                            identitySet.gplxNumber && `GPLX: ${identitySet.gplxNumber}`,
+                            statusText && `(${statusText})`,
+                          ]
+                            .filter(Boolean)
+                            .join(" - ") || `ID: ${identitySet.id}`;
+                          
+                          return (
+                            <SelectItem key={identitySet.id} value={String(identitySet.id)}>
+                              {displayText}
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+
+                    {selectedIdentitySetId != null && (
+                      <div className="rounded-lg border border-gray-200 bg-white p-4">
+                        {(() => {
+                          const identitySet = identitySets.find((x) => x.id === selectedIdentitySetId);
+                          if (!identitySet) return null;
+                          return (
+                            <div className="space-y-2 text-sm">
+                              {identitySet.cccdNumber && (
+                                <div>
+                                  <span className="font-medium text-gray-600">CCCD: </span>
+                                  <span className="text-gray-900">{identitySet.cccdNumber}</span>
+                                </div>
+                              )}
+                              {identitySet.gplxNumber && (
+                                <div>
+                                  <span className="font-medium text-gray-600">GPLX: </span>
+                                  <span className="text-gray-900">{identitySet.gplxNumber}</span>
+                                </div>
+                              )}
+                              {identitySet.status && (
+                                <div>
+                                  <span className="font-medium text-gray-600">Trạng thái: </span>
+                                  <Badge variant={identitySet.status === "APPROVED" ? "default" : "secondary"}>
+                                    {identitySet.status === "PENDING" ? "Chờ duyệt" :
+                                     identitySet.status === "APPROVED" ? "Đã duyệt" :
+                                     identitySet.status === "REJECTED" ? "Từ chối" :
+                                     identitySet.status}
+                                  </Badge>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
+
+                    {!loadingIdentitySets && identitySets.length === 0 && (
+                      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                        <p className="text-sm text-amber-800">
+                          Bạn chưa có giấy tờ nào. Vui lòng{" "}
+                          <Link to="/profile" className="underline font-medium">
+                            cập nhật CCCD/GPLX trong hồ sơ
+                          </Link>{" "}
+                          trước khi đặt xe.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {startDate &&
                 endDate &&

@@ -50,16 +50,20 @@ type ToastFn = ReturnType<typeof useToast>["toast"];
 
 const statusColor = (status: BillingStatus) => {
   switch (status) {
-    case "WAITING":
+    case "PENDING":
       return "bg-amber-100 text-amber-800";
-    case "PAYED":
+    case "LOCKED":
+      return "bg-purple-100 text-purple-800";
+    case "PAID":
       return "bg-emerald-100 text-emerald-800";
-    case "RENTING":
+    case "IN_PROGRESS":
       return "bg-sky-100 text-sky-800";
-    case "DONE":
+    case "RETURNED":
       return "bg-gray-100 text-gray-800";
-    case "CANCELLED":
+    case "CANCELED":
       return "bg-red-100 text-red-800";
+    case "EXPIRED":
+      return "bg-orange-100 text-orange-800";
     default:
       return "bg-gray-100 text-gray-800";
   }
@@ -67,16 +71,20 @@ const statusColor = (status: BillingStatus) => {
 
 const statusText = (status: BillingStatus) => {
   switch (status) {
-    case "WAITING":
+    case "PENDING":
       return "Chờ thanh toán";
-    case "PAYED":
+    case "LOCKED":
+      return "Đã khóa";
+    case "PAID":
       return "Đã thanh toán";
-    case "RENTING":
+    case "IN_PROGRESS":
       return "Đang thuê";
-    case "DONE":
-      return "Hoàn thành";
-    case "CANCELLED":
+    case "RETURNED":
+      return "Đã trả xe";
+    case "CANCELED":
       return "Đã hủy";
+    case "EXPIRED":
+      return "Đã hết hạn";
     default:
       return status;
   }
@@ -288,7 +296,12 @@ const PaymentDialog = ({
                   <InfoRow
                     icon={CreditCard}
                     label="Trạng thái"
-                    value={payload.status}
+                    value={payload.status === "PENDING" ? "Chờ thanh toán" : 
+                           payload.status === "PAID" ? "Đã thanh toán" :
+                           payload.status === "LOCKED" ? "Đã khóa" :
+                           payload.status === "CANCELED" ? "Đã hủy" :
+                           payload.status === "EXPIRED" ? "Hết hạn" :
+                           payload.status}
                   />
                 )}
               </>
@@ -486,23 +499,23 @@ const Bookings = () => {
   }, [currentUserId, loadBookings]);
 
   const waitingBookings = useMemo(
-    () => bookings.filter((booking) => booking.status === "WAITING"),
+    () => bookings.filter((booking) => booking.status === "PENDING"),
     [bookings]
   );
   const payedBookings = useMemo(
-    () => bookings.filter((booking) => booking.status === "PAYED"),
+    () => bookings.filter((booking) => booking.status === "PAID" || booking.status === "LOCKED"),
     [bookings]
   );
   const rentingBookings = useMemo(
-    () => bookings.filter((booking) => booking.status === "RENTING"),
+    () => bookings.filter((booking) => booking.status === "IN_PROGRESS"),
     [bookings]
   );
   const doneBookings = useMemo(
-    () => bookings.filter((booking) => booking.status === "DONE"),
+    () => bookings.filter((booking) => booking.status === "RETURNED"),
     [bookings]
   );
   const cancelledBookings = useMemo(
-    () => bookings.filter((booking) => booking.status === "CANCELLED"),
+    () => bookings.filter((booking) => booking.status === "CANCELED" || booking.status === "EXPIRED"),
     [bookings]
   );
 
@@ -639,12 +652,12 @@ const Bookings = () => {
       );
       const vehicleName =
         booking.localVehicleName ?? booking.vehicleModel ?? `Hóa đơn #${id}`;
-      const allowPay = booking.status === "WAITING";
+      const allowPay = booking.status === "PENDING";
       
       // Tính thời gian còn lại trước khi tự hủy (180 giây từ bookingTime)
       const paymentExpiredAt = booking.paymentExpiredAt || booking.lockExpiredAt;
       const getTimeRemaining = () => {
-        if (booking.status !== "WAITING") return null;
+        if (booking.status !== "PENDING") return null;
         
         let expiredTime: number | null = null;
         
@@ -796,7 +809,7 @@ const Bookings = () => {
               </div>
 
               {/* Chỉ hiển thị "Nhận xe thực tế" khi đã thực sự check-in (status RENTING hoặc DONE) */}
-              {actualPickup !== "—" && (booking.status === "RENTING" || booking.status === "DONE") && (
+              {actualPickup !== "—" && (booking.status === "IN_PROGRESS" || booking.status === "RETURNED") && (
                 <div className="bg-emerald-50 rounded-lg p-4 border border-emerald-100">
                   <div className="flex items-start gap-3">
                     <Calendar className="h-5 w-5 flex-shrink-0 text-emerald-600 mt-0.5" />

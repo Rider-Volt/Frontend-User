@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
-import { User, Mail, Phone, MapPin, Star, Home, Car, IdCard, Image as ImageIcon } from "lucide-react";
+import { Star, Home, Car, IdCard, Image as ImageIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import Navbar from "../components/heroUi/Navbar";
 import Footer from "../components/heroUi/Footer";
@@ -248,126 +248,77 @@ const Profile = () => {
       {/* ✅ Navbar */}
       <Navbar isLoggedIn={!!profile} username={profile.full_name || profile.username} />
 
-      <div className="container mx-auto px-4 py-8 flex-1">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
+      <div className="container mx-auto max-w-6xl px-4 py-8 flex-1">
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold mb-2 text-gray-900">Hồ sơ cá nhân</h1>
-              <p className="text-gray-600">
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Hồ sơ cá nhân</h1>
+              <p className="text-gray-600 text-sm sm:text-base">
                 Quản lý thông tin cá nhân và tài khoản của bạn
               </p>
             </div>
             <Link to="/">
-              <Button className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2 shadow-lg hover:shadow-xl transition-all duration-200">
+              <Button className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2 shadow-md hover:shadow-lg transition-all duration-200">
                 <Home className="w-4 h-4" />
                 Về trang chủ
               </Button>
             </Link>
           </div>
-        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Overview */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-              <div className="text-center">
-                <div className="flex justify-center mb-6">
-                  <div className="relative">
-                    <Avatar className="w-24 h-24 border-4 border-green-100">
-                      <AvatarImage src={avatarPreview || profile.avatar || ""} />
-                      <AvatarFallback className="text-2xl bg-green-100 text-green-700 font-semibold">
-                        {getInitials(profile.full_name || profile.username)}
-                      </AvatarFallback>
-                    </Avatar>
-                    {profile.rating && (
-                      <div className="absolute -bottom-2 -right-2 w-8 h-8 bg-yellow-400 rounded-full flex items-center justify-center">
-                        <Star className="w-4 h-4 fill-white text-white" />
-                      </div>
-                    )}
-                  </div>
+          {/* Account overview */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 md:p-8">
+            <div className="flex flex-col lg:flex-row gap-8">
+              <div className="flex flex-col items-center lg:items-center gap-4 w-full lg:w-56">
+                <div className="relative">
+                  <Avatar className="w-28 h-28 border-4 border-green-100">
+                    <AvatarImage src={avatarPreview || profile.avatar || ""} />
+                    <AvatarFallback className="text-3xl bg-green-100 text-green-700 font-semibold">
+                      {getInitials(profile.full_name || profile.username)}
+                    </AvatarFallback>
+                  </Avatar>
+                  {profile.rating && (
+                    <div className="absolute -bottom-2 -right-2 w-9 h-9 bg-yellow-400 rounded-full flex items-center justify-center shadow">
+                      <Star className="w-4 h-4 fill-white text-white" />
+                    </div>
+                  )}
                 </div>
-                
-                <h2 className="text-xl font-bold text-gray-900 mb-2">
-                  {profile.full_name || profile.username}
-                </h2>
-                
-                {profile.joinDate && (
-                  <p className="text-gray-500 text-sm mb-4">Thành viên từ {joinDateText}</p>
-                )}
-                
-                {profile.rating && (
-                  <div className="flex items-center justify-center gap-1 mb-6">
-                    <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                    <span className="font-semibold text-gray-900">{profile.rating}</span>
-                    <span className="text-gray-500 text-sm">đánh giá</span>
-                  </div>
-                )}
-              </div>
 
-              <div className="space-y-6">
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50">
-                    <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
-                      <User className="w-4 h-4 text-gray-600" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500 font-medium">ID người dùng</p>
-                      <p className="text-sm font-semibold text-gray-900">{profile.id || profile.username}</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50">
-                    <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
-                      <MapPin className="w-4 h-4 text-gray-600" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500 font-medium">Địa chỉ</p>
-                      <p className="text-sm font-semibold text-gray-900">{profile.address || "Chưa cập nhật"}</p>
-                    </div>
-                  </div>
+                <div className="text-center">
+                  <h2 className="text-xl font-semibold text-gray-900">
+                    {profile.full_name || profile.username}
+                  </h2>
+                  {profile.joinDate && (
+                    <p className="text-sm text-gray-500 mt-1">
+                      Tham gia: {joinDateText}
+                    </p>
+                  )}
                 </div>
-              </div>
-            </div>
-          </div>
 
-          {/* Details */}
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-semibold text-gray-900">
-                  <span className="border-b-2 border-green-500 pb-2">Thông tin cá nhân</span>
-                </h3>
-                {!isEditing && (
-                  <Button
-                    className="bg-green-600 hover:bg-green-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
-                    onClick={() => setIsEditing(true)}
-                    disabled={saving}
-                  >
-                    Chỉnh sửa
-                  </Button>
+                {profile.totalBookings != null && (
+                  <div className="flex items-center gap-2 bg-amber-50 text-amber-600 px-3 py-1.5 rounded-full text-sm font-medium">
+                    <Star className="w-4 h-4 fill-amber-500 text-amber-500" />
+                    <span>{profile.totalBookings} chuyến</span>
+                  </div>
                 )}
-              </div>
-              
-              <div className="space-y-6">
-                {/* Avatar Upload */}
-                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                  <Label className="text-sm font-medium text-gray-700 mb-3 block">Ảnh đại diện</Label>
-                  <input
-                    ref={avatarInputRef}
-                    type="file"
-                    accept="image/png,image/jpeg"
-                    className="hidden"
-                    onChange={handleAvatarChange}
-                    disabled={!isEditing || saving}
-                  />
-                  <div className="flex flex-wrap gap-2">
+
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg"
+                  className="hidden"
+                  onChange={handleAvatarChange}
+                  disabled={!isEditing || saving}
+                />
+
+                {isEditing && (
+                  <div className="flex flex-wrap justify-center lg:justify-start gap-2">
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
                       onClick={() => avatarInputRef.current?.click()}
-                      disabled={!isEditing || saving}
+                      disabled={saving}
                       className="border-gray-300 text-gray-700 hover:bg-green-50 hover:border-green-300 hover:text-green-700"
                     >
                       <ImageIcon className="w-4 h-4 mr-2" />
@@ -385,209 +336,254 @@ const Profile = () => {
                         Bỏ chọn
                       </Button>
                     )}
+                    {avatarFile && (
+                      <p className="basis-full text-xs text-green-600 text-center lg:text-left">
+                        ✓ Ảnh mới sẽ hiển thị sau khi bạn lưu thay đổi.
+                      </p>
+                    )}
                   </div>
-                  {avatarFile && (
-                    <p className="text-xs text-green-600 mt-2">
-                      ✓ Ảnh mới sẽ hiển thị sau khi bạn lưu thay đổi.
+                )}
+              </div>
+
+              <div className="flex-1 space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                  <div>
+                    <h3 className="text-xl font-semibold text-gray-900">Thông tin tài khoản</h3>
+                    <p className="text-sm text-gray-500">
+                      Cập nhật nhanh thông tin liên hệ và xác thực
                     </p>
+                  </div>
+
+                  {isEditing ? (
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={handleSave}
+                        disabled={saving}
+                        className="bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-lg transition-all duration-200"
+                      >
+                        {saving ? (
+                          <div className="flex items-center gap-2">
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            Đang lưu...
+                          </div>
+                        ) : (
+                          "Lưu thay đổi"
+                        )}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={handleCancel}
+                        disabled={saving}
+                        className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                      >
+                        Hủy
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      className="bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-lg transition-all duration-200"
+                      onClick={() => setIsEditing(true)}
+                      disabled={saving}
+                    >
+                      Chỉnh sửa
+                    </Button>
                   )}
                 </div>
 
-                {/* Personal Information Form */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="name" className="text-sm font-medium text-gray-700">Họ và tên</Label>
-                    <Input
-                      id="name"
-                      value={editData.full_name}
-                      onChange={(e) =>
-                        setEditData({ ...editData, full_name: e.target.value })
-                      }
-                      disabled={!isEditing || saving}
-                      className="border-gray-300 focus:border-green-500 focus:ring-green-500"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email" className="text-sm font-medium text-gray-700">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={editData.email}
-                      onChange={(e) =>
-                        setEditData({ ...editData, email: e.target.value })
-                      }
-                      disabled={!isEditing || saving}
-                      className="border-gray-300 focus:border-green-500 focus:ring-green-500"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phone" className="text-sm font-medium text-gray-700">Số điện thoại</Label>
-                    <Input
-                      id="phone"
-                      value={editData.phone}
-                      onChange={(e) =>
-                        setEditData({ ...editData, phone: e.target.value })
-                      }
-                      disabled={!isEditing || saving}
-                      className="border-gray-300 focus:border-green-500 focus:ring-green-500"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="address" className="text-sm font-medium text-gray-700">Địa chỉ</Label>
-                    <Input
-                      id="address"
-                      value={editData.address}
-                      onChange={(e) =>
-                        setEditData({ ...editData, address: e.target.value })
-                      }
-                      disabled={!isEditing || saving}
-                      className="border-gray-300 focus:border-green-500 focus:ring-green-500"
-                    />
-                  </div>
-                </div>
-
-                {/* Document Uploads */}
-                <div className="space-y-6">
-                  <h4 className="text-lg font-semibold text-gray-900">
-                    <span className="border-b-2 border-green-500 pb-2">Ảnh giấy tờ</span>
-                  </h4>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* CCCD Upload */}
-                    <div className="space-y-3">
-                      <Label className="text-sm font-medium text-gray-700">Ảnh CCCD</Label>
-                      <input
-                        ref={nationalIdInputRef}
-                        type="file"
-                        accept="image/png,image/jpeg"
-                        className="hidden"
-                        onChange={handleNationalIdChange}
-                        disabled={!isEditing || saving}
+                <div className="grid gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-2 sm:gap-4 items-center">
+                    <span className="text-sm font-medium text-gray-500 uppercase tracking-wide">Họ và tên</span>
+                    {isEditing ? (
+                      <Input
+                        id="name"
+                        value={editData.full_name}
+                        onChange={(e) =>
+                          setEditData({ ...editData, full_name: e.target.value })
+                        }
+                        disabled={saving}
+                        className="border-gray-300 focus:border-green-500 focus:ring-green-500"
                       />
-                      <div className="flex items-center gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => nationalIdInputRef.current?.click()}
-                          disabled={!isEditing || saving}
-                          className="border-gray-300 text-gray-700 hover:bg-green-50 hover:border-green-300 hover:text-green-700"
-                        >
-                          <IdCard className="w-4 h-4 mr-2" />
-                          Chọn ảnh
-                        </Button>
-                        {nationalIdImageFile && (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            onClick={clearNationalIdSelection}
-                            disabled={saving}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            Bỏ chọn
-                          </Button>
-                        )}
-                      </div>
-                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 bg-gray-50 flex items-center justify-center min-h-[160px] hover:border-green-400 transition-colors">
-                        {(nationalIdImagePreview || (profile.nationalIdImageUrl && !nationalIdImageError)) ? (
-                          <img
-                            src={nationalIdImagePreview || profile.nationalIdImageUrl!}
-                            alt="Ảnh CCCD"
-                            className="max-h-48 object-contain rounded shadow-sm"
-                            onError={() => setNationalIdImageError(true)}
-                          />
-                        ) : (
-                          <div className="text-center text-gray-500">
-                            <ImageIcon className="w-8 h-8 mx-auto mb-2" />
-                            <p className="text-sm">Chưa có ảnh CCCD</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Driver License Upload */}
-                    <div className="space-y-3">
-                      <Label className="text-sm font-medium text-gray-700">Ảnh GPLX</Label>
-                      <input
-                        ref={driverLicenseInputRef}
-                        type="file"
-                        accept="image/png,image/jpeg"
-                        className="hidden"
-                        onChange={handleDriverLicenseChange}
-                        disabled={!isEditing || saving}
-                      />
-                      <div className="flex items-center gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => driverLicenseInputRef.current?.click()}
-                          disabled={!isEditing || saving}
-                          className="border-gray-300 text-gray-700 hover:bg-green-50 hover:border-green-300 hover:text-green-700"
-                        >
-                          <Car className="w-4 h-4 mr-2" />
-                          Chọn ảnh
-                        </Button>
-                        {driverLicenseImageFile && (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            onClick={clearDriverLicenseSelection}
-                            disabled={saving}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            Bỏ chọn
-                          </Button>
-                        )}
-                      </div>
-                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 bg-gray-50 flex items-center justify-center min-h-[160px] hover:border-green-400 transition-colors">
-                        {(driverLicenseImagePreview || (profile.driverLicenseImageUrl && !driverLicenseImageError)) ? (
-                          <img
-                            src={driverLicenseImagePreview || profile.driverLicenseImageUrl!}
-                            alt="Ảnh GPLX"
-                            className="max-h-48 object-contain rounded shadow-sm"
-                            onError={() => setDriverLicenseImageError(true)}
-                          />
-                        ) : (
-                          <div className="text-center text-gray-500">
-                            <ImageIcon className="w-8 h-8 mx-auto mb-2" />
-                            <p className="text-sm">Chưa có ảnh GPLX</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                    ) : (
+                      <span className="text-base font-semibold text-gray-900">
+                        {profile.full_name || profile.username}
+                      </span>
+                    )}
                   </div>
-                </div>
 
-                {/* Action Buttons */}
-                {isEditing && (
-                  <div className="flex gap-3 pt-6 border-t border-gray-200">
-                    <Button 
-                      onClick={handleSave} 
-                      disabled={saving}
-                      className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 shadow-lg hover:shadow-xl transition-all duration-200"
-                    >
-                      {saving ? (
-                        <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                          Đang lưu...
+                  <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-2 sm:gap-4 items-center">
+                    <span className="text-sm font-medium text-gray-500 uppercase tracking-wide">Số điện thoại</span>
+                    {isEditing ? (
+                      <Input
+                        id="phone"
+                        value={editData.phone}
+                        onChange={(e) =>
+                          setEditData({ ...editData, phone: e.target.value })
+                        }
+                        disabled={saving}
+                        className="border-gray-300 focus:border-green-500 focus:ring-green-500"
+                      />
+                    ) : (
+                      <span className="text-base font-semibold text-gray-900">
+                        {profile.phone || "Chưa cập nhật"}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-2 sm:gap-4 items-center">
+                    <span className="text-sm font-medium text-gray-500 uppercase tracking-wide">Email</span>
+                    {isEditing ? (
+                      <Input
+                        id="email"
+                        type="email"
+                        value={editData.email}
+                        onChange={(e) =>
+                          setEditData({ ...editData, email: e.target.value })
+                        }
+                        disabled={saving}
+                        className="border-gray-300 focus:border-green-500 focus:ring-green-500"
+                      />
+                    ) : (
+                      <span className="text-base font-semibold text-gray-900 break-words">
+                        {profile.email || "Chưa cập nhật"}
+                      </span>
+                    )}
+                  </div>
+
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* License section */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 md:p-8 space-y-6">
+            <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+              <div>
+                <h3 className="text-xl font-semibold text-gray-900">Giấy phép lái xe và Căn Cước Công Dân </h3>
+                <p className="text-sm text-gray-500">
+              Để tránh phát sinh vấn đề khi thuê xe, hãy xác thực GPLX và CCCD trùng khớp thông tin cá nhân của bạn.
+                </p>
+              </div>
+              {/* Removed 'Chưa xác thực' status chip */}
+            </div>
+
+            {/* Removed general warning note per request */}
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-sm font-medium text-gray-700 mb-1 block">Ảnh GPLX</Label>
+                  <div className="border-2 border-dashed border-gray-300 bg-gray-50 rounded-2xl flex flex-col items-center justify-center min-h-[200px] p-6 text-gray-500 text-sm">
+                    {(driverLicenseImagePreview || (profile.driverLicenseImageUrl && !driverLicenseImageError)) ? (
+                      <img
+                        src={driverLicenseImagePreview || profile.driverLicenseImageUrl!}
+                        alt="Ảnh GPLX"
+                        className="max-h-48 object-contain rounded shadow-sm"
+                        onError={() => setDriverLicenseImageError(true)}
+                      />
+                    ) : (
+                      <>
+                        <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mb-3">
+                          <ImageIcon className="w-6 h-6 text-green-500" />
                         </div>
-                      ) : (
-                        "Lưu thay đổi"
-                      )}
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      onClick={handleCancel} 
-                      disabled={saving}
-                      className="border-gray-300 text-gray-700 hover:bg-gray-50 px-6 py-2"
-                    >
-                      Hủy
-                    </Button>
+                        <p>Tải ảnh GPLX của bạn</p>
+                      </>
+                    )}
                   </div>
-                )}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 mt-3">
+                  <input
+                      ref={driverLicenseInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg"
+                      className="hidden"
+                      onChange={handleDriverLicenseChange}
+                      disabled={!isEditing || saving}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => driverLicenseInputRef.current?.click()}
+                      disabled={!isEditing || saving}
+                      className="border-gray-300 text-gray-700 hover:bg-green-50 hover:border-green-300 hover:text-green-700"
+                    >
+                      <Car className="w-4 h-4 mr-2" />
+                      Chọn ảnh GPLX
+                    </Button>
+                    {driverLicenseImageFile && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={clearDriverLicenseSelection}
+                        disabled={saving}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        Bỏ chọn
+                      </Button>
+                    )}
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-sm font-medium text-gray-700 mb-1 block">Ảnh CCCD</Label>
+                  <div className="border-2 border-dashed border-gray-300 bg-gray-50 rounded-2xl flex flex-col items-center justify-center min-h-[200px] p-6 text-gray-500 text-sm">
+                    {(nationalIdImagePreview || (profile.nationalIdImageUrl && !nationalIdImageError)) ? (
+                      <img
+                        src={nationalIdImagePreview || profile.nationalIdImageUrl!}
+                        alt="Ảnh CCCD"
+                        className="max-h-48 object-contain rounded shadow-sm"
+                        onError={() => setNationalIdImageError(true)}
+                      />
+                    ) : (
+                      <>
+                        <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mb-3">
+                          <ImageIcon className="w-6 h-6 text-green-500" />
+                        </div>
+                        <p>Chưa có ảnh CCCD</p>
+                      </>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 mt-3">
+                    <input
+                      ref={nationalIdInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg"
+                      className="hidden"
+                      onChange={handleNationalIdChange}
+                      disabled={!isEditing || saving}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => nationalIdInputRef.current?.click()}
+                      disabled={!isEditing || saving}
+                      className="border-gray-300 text-gray-700 hover:bg-green-50 hover:border-green-300 hover:text-green-700"
+                    >
+                      <IdCard className="w-4 h-4 mr-2" />
+                      Chọn ảnh CCCD
+                    </Button>
+                    {nationalIdImageFile && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={clearNationalIdSelection}
+                        disabled={saving}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        Bỏ chọn
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                <Separator />
+
+               
               </div>
             </div>
           </div>

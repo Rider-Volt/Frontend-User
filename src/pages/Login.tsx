@@ -55,7 +55,7 @@ const Login = () => {
         description: "Chào mừng bạn đến với EV Station!",
       });
 
-      navigate("/");
+      navigate("/profile");
     } catch (error: any) {
       setError(error?.message || "Sai email hoặc mật khẩu");
     } finally {

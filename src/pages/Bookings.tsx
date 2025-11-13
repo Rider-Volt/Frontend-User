@@ -56,9 +56,9 @@ const statusColor = (status: BillingStatus) => {
       return "bg-purple-100 text-purple-800";
     case "PAID":
       return "bg-emerald-100 text-emerald-800";
-    case "IN_PROGRESS":
+    case "RENTING":
       return "bg-sky-100 text-sky-800";
-    case "RETURNED":
+    case "DONE":
       return "bg-gray-100 text-gray-800";
     case "CANCELED":
       return "bg-red-100 text-red-800";
@@ -77,9 +77,9 @@ const statusText = (status: BillingStatus) => {
       return "Đã khóa";
     case "PAID":
       return "Đã thanh toán";
-    case "IN_PROGRESS":
+    case "RENTING":
       return "Đang thuê";
-    case "RETURNED":
+    case "DONE":
       return "Đã trả xe";
     case "CANCELED":
       return "Đã hủy";
@@ -452,7 +452,7 @@ const Bookings = () => {
   // Kiểm tra URL params để set tab mặc định
   useEffect(() => {
     const tabParam = searchParams.get("tab");
-    if (tabParam && ["all", "waiting", "payed", "renting", "done", "cancelled"].includes(tabParam)) {
+    if (tabParam && ["all", "waiting", "payed", "renting", "done", "cancelled", "expired"].includes(tabParam)) {
       setActiveTab(tabParam);
     }
   }, [searchParams]);
@@ -507,15 +507,19 @@ const Bookings = () => {
     [bookings]
   );
   const rentingBookings = useMemo(
-    () => bookings.filter((booking) => booking.status === "IN_PROGRESS"),
+    () => bookings.filter((booking) => booking.status === "RENTING"),
     [bookings]
   );
   const doneBookings = useMemo(
-    () => bookings.filter((booking) => booking.status === "RETURNED"),
+    () => bookings.filter((booking) => booking.status === "DONE"),
     [bookings]
   );
   const cancelledBookings = useMemo(
-    () => bookings.filter((booking) => booking.status === "CANCELED" || booking.status === "EXPIRED"),
+    () => bookings.filter((booking) => booking.status === "CANCELED"),
+    [bookings]
+  );
+  const expiredBookings = useMemo(
+    () => bookings.filter((booking) => booking.status === "EXPIRED"),
     [bookings]
   );
 
@@ -809,7 +813,7 @@ const Bookings = () => {
               </div>
 
               {/* Chỉ hiển thị "Nhận xe thực tế" khi đã thực sự check-in (status RENTING hoặc DONE) */}
-              {actualPickup !== "—" && (booking.status === "IN_PROGRESS" || booking.status === "RETURNED") && (
+              {actualPickup !== "—" && (booking.status === "RENTING" || booking.status === "DONE") && (
                 <div className="bg-emerald-50 rounded-lg p-4 border border-emerald-100">
                   <div className="flex items-start gap-3">
                     <Calendar className="h-5 w-5 flex-shrink-0 text-emerald-600 mt-0.5" />
@@ -919,21 +923,64 @@ const Bookings = () => {
               <div className="flex flex-wrap gap-3 pt-2">
                 <Button
                   onClick={async () => {
-                    // VietQR payment with real bank account
-                    const info = await createDemoPaymentInfo({
-                      billingId: booking.bookingId,
-                      amount: booking.totalCharge || 10000,
-                    });
-                    setPaymentDialog({
-                      bookingId: booking.bookingId,
-                      payload: info,
-                      checkoutUrl: undefined,
-                      qrUrl: info.qrImageUrl,
-                    });
+                    const billingId = booking.id ?? booking.bookingId;
+                    if (!billingId) {
+                      toast({
+                        title: "Không tìm thấy mã hóa đơn",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+
+                    try {
+                      setPayingId(billingId);
+                      const payload = await createPayOSPaymentLink(billingId);
+                      const checkoutUrl = extractCheckoutUrl(payload);
+                      
+                      // Nếu có checkoutUrl, chuyển thẳng đến trang PayOS
+                      if (checkoutUrl) {
+                        window.location.href = checkoutUrl;
+                        return;
+                      }
+                      
+                      // Nếu không có checkoutUrl nhưng có QR code, hiển thị dialog
+                      const qrUrl = extractQrCode(payload);
+                      if (qrUrl) {
+                        setPaymentDialog({
+                          bookingId: billingId,
+                          payload,
+                          checkoutUrl: undefined,
+                          qrUrl,
+                        });
+                      } else {
+                        toast({
+                          title: "Không tìm thấy liên kết PayOS",
+                          description: "Vui lòng thử lại sau hoặc liên hệ hỗ trợ.",
+                          variant: "destructive",
+                        });
+                      }
+                    } catch (err) {
+                      toast({
+                        title: "Không tạo được liên kết thanh toán",
+                        description:
+                          err instanceof Error ? err.message : "Vui lòng thử lại sau.",
+                        variant: "destructive",
+                      });
+                    } finally {
+                      setPayingId(null);
+                    }
                   }}
                   className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-6 shadow-sm"
+                  disabled={payingId === (booking.id ?? booking.bookingId)}
                 >
-                  Thanh toán VietQR
+                  {payingId === (booking.id ?? booking.bookingId) ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Đang xử lý...
+                    </>
+                  ) : (
+                    "Thanh toán VietQR"
+                  )}
                 </Button>
                 <Button
                   variant="destructive"
@@ -1040,7 +1087,7 @@ const Bookings = () => {
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 bg-white border border-gray-200 rounded-lg p-1.5 gap-1 h-auto">
+            <TabsList className="grid w-full grid-cols-3 lg:grid-cols-7 bg-white border border-gray-200 rounded-lg p-1.5 gap-1 h-auto">
               <TabsTrigger 
                 value="all" 
                 className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-sm text-xs font-semibold py-2.5 rounded-md transition-all"
@@ -1076,6 +1123,12 @@ const Bookings = () => {
                 className="data-[state=active]:bg-red-500 data-[state=active]:text-white data-[state=active]:shadow-sm text-xs font-semibold py-2.5 rounded-md transition-all"
               >
                 Đã hủy ({cancelledBookings.length})
+              </TabsTrigger>
+              <TabsTrigger 
+                value="expired"
+                className="data-[state=active]:bg-orange-500 data-[state=active]:text-white data-[state=active]:shadow-sm text-xs font-semibold py-2.5 rounded-md transition-all"
+              >
+                Hết hạn ({expiredBookings.length})
               </TabsTrigger>
             </TabsList>
 
@@ -1119,6 +1172,13 @@ const Bookings = () => {
               cancelledBookings,
               "Không có hóa đơn bị hủy",
               "Nếu bạn hủy đặt xe, hóa đơn sẽ hiển thị tại đây."
+            )}
+          </TabsContent>
+          <TabsContent value="expired" className="space-y-5 mt-6">
+            {renderList(
+              expiredBookings,
+              "Không có hóa đơn hết hạn",
+              "Các hóa đơn đã hết hạn thanh toán sẽ hiển thị tại đây."
             )}
           </TabsContent>
         </Tabs>

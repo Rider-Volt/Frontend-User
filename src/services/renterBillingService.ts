@@ -1,6 +1,13 @@
 ﻿import { API_BASE, authHeaders, getAuthToken } from "./authService";
+import {
+  IdentityAsset,
+  IdentitySet,
+  IdentityStatus,
+  IdentityAssetType,
+} from "@/types/identity";
 
 const BASE = `${API_BASE}/renter/billings`;
+const IDENTITY_BASE = `${API_BASE}/renter/identity-sets`;
 
 // Retry mechanism cho các API calls quan trọng
 async function fetchWithRetry(
@@ -52,11 +59,13 @@ function requireToken(): string {
 }
 
 export type BillingStatus =
-  | "WAITING"
-  | "PAYED"
+  | "PENDING"
+  | "LOCKED"
+  | "PAID"
   | "RENTING"
   | "DONE"
-  | "CANCELLED";
+  | "CANCELED"
+  | "EXPIRED";
 
 export interface CreateBillingRequest {
   stationId: number;
@@ -82,7 +91,9 @@ export interface RenterBillingResponse {
   actualPickupAt?: string | null;
   actualReturnAt?: string | null;
   preImage?: string | null;
+  preImages?: string[] | null;
   finalImage?: string | null;
+  finalImages?: string[] | null;
   contractBeforeImage?: string | null;
   contractAfterImage?: string | null;
   status: BillingStatus;
@@ -93,6 +104,17 @@ export interface RenterBillingResponse {
   currentOrderCode?: number | null;
   // Legacy field for backward compatibility
   vehicleCode?: string | null;
+  paymentInfo?: {
+    paymentLinkId?: string;
+    orderCode?: number;
+    amount?: number;
+    description?: string;
+    status?: string;
+    checkoutUrl?: string;
+    qrCode?: string;
+    currency?: string;
+    expiredAt?: string;
+  } | null;
 }
 
 export async function createBilling(
@@ -253,7 +275,6 @@ export interface PayOSWebhookPayload {
   [key: string]: any;
 }
 
-
 export async function payOSWebhook(
   payload: PayOSWebhookPayload
 ): Promise<Record<string, never>> {
@@ -274,4 +295,72 @@ export async function payOSWebhook(
   }
   
   return (data || {}) as Record<string, never>;
+}
+
+function normalizeIdentityAsset(raw: any): IdentityAsset {
+  return {
+    id: typeof raw?.id === "number" ? raw.id : undefined,
+    type: typeof raw?.type === "string" ? raw.type : undefined,
+    url: typeof raw?.url === "string" ? raw.url : undefined,
+    note: typeof raw?.note === "string" ? raw.note : null,
+    takenAt: typeof raw?.takenAt === "string" ? raw.takenAt : null,
+    takenBy:
+      typeof raw?.takenBy === "number"
+        ? raw.takenBy
+        : typeof raw?.takenBy === "string"
+        ? Number(raw.takenBy)
+        : null,
+  };
+}
+
+function normalizeIdentitySet(raw: any): IdentitySet {
+  return {
+    id: typeof raw?.id === "number" ? raw.id : Number(raw?.id) || 0,
+    cccdNumber: typeof raw?.cccdNumber === "string" ? raw.cccdNumber : null,
+    gplxNumber: typeof raw?.gplxNumber === "string" ? raw.gplxNumber : null,
+    note: typeof raw?.note === "string" ? raw.note : null,
+    status: typeof raw?.status === "string" ? raw.status : undefined,
+    reviewNote: typeof raw?.reviewNote === "string" ? raw.reviewNote : null,
+    reviewedBy:
+      typeof raw?.reviewedBy === "number"
+        ? raw.reviewedBy
+        : typeof raw?.reviewedBy === "string"
+        ? Number(raw.reviewedBy)
+        : null,
+    reviewedAt: typeof raw?.reviewedAt === "string" ? raw.reviewedAt : null,
+    assets: Array.isArray(raw?.assets)
+      ? raw.assets.map(normalizeIdentityAsset)
+      : [],
+  };
+}
+
+export async function listIdentitySets(): Promise<IdentitySet[]> {
+  const token = requireToken();
+  const resp = await fetchWithRetry(IDENTITY_BASE, {
+    method: "GET",
+    headers: authHeaders(token),
+  });
+
+  let data: any = [];
+  try {
+    data = await resp.json();
+  } catch {
+    data = [];
+  }
+
+  if (!resp.ok) {
+    const message =
+      (data && typeof data?.message === "string" && data.message) ||
+      resp.statusText ||
+      "Khong the tai danh sach giay to";
+    throw new Error(message);
+  }
+
+  if (!Array.isArray(data)) {
+    return [];
+  }
+
+  const sets = data.map(normalizeIdentitySet) as IdentitySet[];
+  // Sort by id desc to make latest first, fallback to original order
+  return sets.sort((a, b) => (b.id || 0) - (a.id || 0));
 }

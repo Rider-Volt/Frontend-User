@@ -56,14 +56,14 @@ function normalizeStored(entry: StoredBooking): StoredBooking {
   const statusMap: Record<string, BillingStatus> = {
     WAITING: "PENDING", // Legacy mapping
     PAYED: "PAID", // Legacy mapping
-    RENTING: "IN_PROGRESS", // Legacy mapping
-    DONE: "RETURNED", // Legacy mapping
+    RENTING: "RENTING", // API status
+    DONE: "DONE", // API status
     CANCELLED: "CANCELED", // Legacy mapping
     PENDING: "PENDING",
     LOCKED: "LOCKED",
     PAID: "PAID",
-    IN_PROGRESS: "IN_PROGRESS",
-    RETURNED: "RETURNED",
+    IN_PROGRESS: "RENTING", // Map old internal value to API value
+    RETURNED: "DONE", // Map old internal value to API value
     CANCELED: "CANCELED",
     EXPIRED: "EXPIRED",
   };
@@ -150,8 +150,8 @@ export const BookingStatuses: BillingStatus[] = [
   "PENDING",
   "LOCKED",
   "PAID",
-  "IN_PROGRESS",
-  "RETURNED",
+  "RENTING",
+  "DONE",
   "CANCELED",
   "EXPIRED",
 ];

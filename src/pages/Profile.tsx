@@ -11,8 +11,9 @@ import { Star, Home, Car, IdCard, Image as ImageIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import Navbar from "../components/heroUi/Navbar";
 import Footer from "../components/heroUi/Footer";
-import { getCurrentUser, refreshCurrentUser, updateUser, LoginResponse, uploadIdentitySet, getAuthToken } from "@/services/authService";
-import { listIdentitySets, IdentitySet } from "@/services/renterBillingService";
+import { getCurrentUser, refreshCurrentUser, updateUser, LoginResponse, uploadIdentitySet, getAuthToken, UploadIdentitySetParams, updateIdentityNumbers, uploadIdentityDocument } from "@/services/authService";
+import { listIdentitySets } from "@/services/renterBillingService";
+import { IdentitySet } from "@/types/identity";
 
 const Profile = () => {
   const [profile, setProfile] = useState<LoginResponse | null>(null);
@@ -50,6 +51,10 @@ const Profile = () => {
   const [loadingIdentitySets, setLoadingIdentitySets] = useState(false);
   
   const [note, setNote] = useState("");
+  
+  // Số giấy tờ
+  const [cccdNumber, setCccdNumber] = useState("");
+  const [gplxNumber, setGplxNumber] = useState("");
 
   const [editData, setEditData] = useState({
     full_name: "",
@@ -175,6 +180,15 @@ const Profile = () => {
         phone: local.phone || "",
         address: local.address || "",
       });
+        if (Array.isArray(local.identitySets)) {
+        setIdentitySets(local.identitySets);
+        // Lấy số giấy tờ từ identity set mới nhất
+        const latestSet = local.identitySets[local.identitySets.length - 1];
+        if (latestSet) {
+          if (latestSet.cccdNumber) setCccdNumber(latestSet.cccdNumber);
+          if (latestSet.gplxNumber) setGplxNumber(latestSet.gplxNumber);
+        }
+      }
     }
   }, []);
 
@@ -191,6 +205,15 @@ const Profile = () => {
           phone: refreshed.phone || "",
           address: refreshed.address || "",
         });
+        if (Array.isArray(refreshed.identitySets)) {
+          setIdentitySets(refreshed.identitySets);
+          // Lấy số giấy tờ từ identity set mới nhất
+          const latestSet = refreshed.identitySets[refreshed.identitySets.length - 1];
+          if (latestSet) {
+            if (latestSet.cccdNumber) setCccdNumber(latestSet.cccdNumber);
+            if (latestSet.gplxNumber) setGplxNumber(latestSet.gplxNumber);
+          }
+        }
       } catch (err) {
         console.warn("Không thể đồng bộ hồ sơ từ máy chủ", err);
       } finally {
@@ -205,8 +228,13 @@ const Profile = () => {
   }, []);
 
   // Load identity sets
+  const profileIdentityKey = useMemo(() => {
+    if (!profile) return "";
+    return typeof profile.id === "number" ? `id:${profile.id}` : `user:${profile.username || "unknown"}`;
+  }, [profile]);
+
   useEffect(() => {
-    if (!profile) return;
+    if (!profile || !profileIdentityKey) return;
     let active = true;
     (async () => {
       try {
@@ -214,24 +242,32 @@ const Profile = () => {
         const sets = await listIdentitySets();
         if (!active) return;
         setIdentitySets(sets);
-        // Tự động load ảnh từ identity set mới nhất nếu có
-        if (sets.length > 0) {
-          const latestSet = sets[0];
-          if (latestSet.assets && latestSet.assets.length > 0) {
-            const cccdFront = latestSet.assets.find(a => a.type === "CCCD_FRONT");
-            const cccdBack = latestSet.assets.find(a => a.type === "CCCD_BACK");
-            const gplxFront = latestSet.assets.find(a => a.type === "GPLX_FRONT");
-            const gplxBack = latestSet.assets.find(a => a.type === "GPLX_BACK");
-            
-            // Cập nhật profile với URL từ identity set
-            if (cccdFront && !profile.nationalIdImageUrl) {
-              setProfile({ ...profile, nationalIdImageUrl: cccdFront.url });
-            }
-            if (gplxFront && !profile.driverLicenseImageUrl) {
-              setProfile({ ...profile, driverLicenseImageUrl: gplxFront.url });
-            }
-          }
+        // Lấy số giấy tờ từ identity set mới nhất
+        const latestSet = sets[sets.length - 1];
+        if (latestSet) {
+          if (latestSet.cccdNumber) setCccdNumber(latestSet.cccdNumber);
+          if (latestSet.gplxNumber) setGplxNumber(latestSet.gplxNumber);
         }
+        setProfile((prev) =>
+          prev
+            ? {
+                ...prev,
+                identitySets: sets,
+                nationalIdImageUrl:
+                  prev.nationalIdImageUrl ||
+                  sets
+                    .flatMap((set) => set.assets || [])
+                    .find((a) => a.type === "CCCD_FRONT")?.url ||
+                  prev.nationalIdImageUrl,
+                driverLicenseImageUrl:
+                  prev.driverLicenseImageUrl ||
+                  sets
+                    .flatMap((set) => set.assets || [])
+                    .find((a) => a.type === "GPLX_FRONT")?.url ||
+                  prev.driverLicenseImageUrl,
+              }
+            : prev
+        );
       } catch (err) {
         console.warn("Không thể tải danh sách giấy tờ", err);
       } finally {
@@ -243,7 +279,7 @@ const Profile = () => {
     return () => {
       active = false;
     };
-  }, [profile]);
+  }, [profileIdentityKey]);
 
   useEffect(
     () => () => {
@@ -279,94 +315,7 @@ const Profile = () => {
         throw new Error("Bạn cần đăng nhập để cập nhật");
       }
 
-      // Upload identity set nếu có file giấy tờ
-      // Upload GPLX mặt trước
-      if (gplxFrontFile) {
-        try {
-          await uploadIdentitySet(
-            {
-              gplxFile: gplxFrontFile,
-              gplxSide: "front",
-            },
-            token
-          );
-        } catch (err: any) {
-          console.warn("Lỗi upload GPLX mặt trước:", err);
-        }
-      }
-
-      // Upload GPLX mặt sau
-      if (gplxBackFile) {
-        try {
-          await uploadIdentitySet(
-            {
-              gplxFile: gplxBackFile,
-              gplxSide: "back",
-            },
-            token
-          );
-        } catch (err: any) {
-          console.warn("Lỗi upload GPLX mặt sau:", err);
-        }
-      }
-
-      // Upload CCCD mặt trước
-      if (cccdFrontFile) {
-        try {
-          await uploadIdentitySet(
-            {
-              cccdFile: cccdFrontFile,
-              cccdSide: "front",
-            },
-            token
-          );
-        } catch (err: any) {
-          console.warn("Lỗi upload CCCD mặt trước:", err);
-        }
-      }
-
-      // Upload CCCD mặt sau
-      if (cccdBackFile) {
-        try {
-          await uploadIdentitySet(
-            {
-              cccdFile: cccdBackFile,
-              cccdSide: "back",
-            },
-            token
-          );
-        } catch (err: any) {
-          console.warn("Lỗi upload CCCD mặt sau:", err);
-        }
-      }
-
-      // Upload note nếu có
-      if (note && (gplxFrontFile || gplxBackFile || cccdFrontFile || cccdBackFile)) {
-        try {
-          // Note có thể được gửi kèm với lần upload cuối cùng
-          await uploadIdentitySet(
-            {
-              note: note,
-            },
-            token
-          );
-        } catch (err: any) {
-          console.warn("Lỗi upload ghi chú:", err);
-        }
-      }
-
-      // Reload identity sets sau khi upload thành công
-      if (gplxFrontFile || gplxBackFile || cccdFrontFile || cccdBackFile) {
-        try {
-          const sets = await listIdentitySets();
-          setIdentitySets(sets);
-        } catch (err: any) {
-          console.warn("Lỗi reload identity sets:", err);
-        }
-      }
-
-      // Cập nhật thông tin profile
-      const updated = await updateUser({
+      const updatedProfile = await updateUser({
         full_name: editData.full_name,
         email: editData.email,
         phone: editData.phone,
@@ -374,12 +323,110 @@ const Profile = () => {
         avatarFile,
         // Không truyền giấy tờ vào updateUser nữa vì đã upload riêng
       });
-      setProfile(updated);
+      let nextProfile = updatedProfile;
+
+      const identityUploads: UploadIdentitySetParams[] = [];
+      if (gplxFrontFile) {
+        identityUploads.push({
+          gplxFile: gplxFrontFile,
+          gplxSide: "front" as const,
+        });
+      }
+      if (gplxBackFile) {
+        identityUploads.push({
+          gplxFile: gplxBackFile,
+          gplxSide: "back" as const,
+        });
+      }
+      if (cccdFrontFile) {
+        identityUploads.push({
+          cccdFile: cccdFrontFile,
+          cccdSide: "front" as const,
+        });
+      }
+      if (cccdBackFile) {
+        identityUploads.push({
+          cccdFile: cccdBackFile,
+          cccdSide: "back" as const,
+        });
+      }
+
+      const trimmedNote = note.trim();
+      if (trimmedNote) {
+        if (identityUploads.length > 0) {
+          identityUploads[identityUploads.length - 1].note = trimmedNote;
+        } else {
+          identityUploads.push({ note: trimmedNote });
+        }
+      }
+
+      if (identityUploads.length > 0) {
+        const uploadErrors: string[] = [];
+        for (const payload of identityUploads) {
+          try {
+            // Upload từng file riêng lẻ với API endpoint riêng và query parameter side
+            if (payload.gplxFile) {
+              await uploadIdentityDocument("gplx", payload.gplxFile, token, payload.gplxSide || "front");
+            }
+            if (payload.cccdFile) {
+              await uploadIdentityDocument("cccd", payload.cccdFile, token, payload.cccdSide || "front");
+            }
+            // Nếu chỉ có note mà không có file, vẫn cần upload để tạo identity set mới
+            if (payload.note && !payload.gplxFile && !payload.cccdFile) {
+              await uploadIdentitySet(payload, token);
+            }
+          } catch (error: any) {
+            const message =
+              error instanceof Error
+                ? error.message
+                : typeof error === "string"
+                ? error
+                : "Không thể tải lên giấy tờ";
+            uploadErrors.push(message);
+            console.warn("Lỗi upload giấy tờ:", error);
+          }
+        }
+
+        try {
+          const sets = await listIdentitySets();
+          setIdentitySets(sets);
+          nextProfile = { ...nextProfile, identitySets: sets };
+        } catch (err: any) {
+          console.warn("Lỗi reload identity sets:", err);
+        }
+
+        if (uploadErrors.length > 0) {
+          throw new Error(uploadErrors[0]);
+        }
+      }
+
+      // Cập nhật số giấy tờ nếu có (chạy độc lập với upload ảnh)
+      const hasCccdNumber = cccdNumber.trim().length > 0;
+      const hasGplxNumber = gplxNumber.trim().length > 0;
+      if (hasCccdNumber || hasGplxNumber) {
+        try {
+          await updateIdentityNumbers(
+            {
+              cccdNumber: hasCccdNumber ? cccdNumber.trim() : undefined,
+              gplxNumber: hasGplxNumber ? gplxNumber.trim() : undefined,
+            },
+            token
+          );
+          // Refresh profile sau khi cập nhật số giấy tờ
+          const refreshed = await refreshCurrentUser();
+          nextProfile = refreshed;
+        } catch (error: any) {
+          console.warn("Lỗi cập nhật số giấy tờ:", error);
+          // Không throw error để không chặn việc lưu các thông tin khác
+        }
+      }
+
+      setProfile(nextProfile);
       setEditData({
-        full_name: updated.full_name || updated.username,
-        email: updated.email || "",
-        phone: updated.phone || "",
-        address: updated.address || "",
+        full_name: nextProfile.full_name || nextProfile.username,
+        email: nextProfile.email || "",
+        phone: nextProfile.phone || "",
+        address: nextProfile.address || "",
       });
       setIsEditing(false);
       clearAvatarSelection();
@@ -404,11 +451,21 @@ const Profile = () => {
       phone: profile.phone || "",
       address: profile.address || "",
     });
+    // Reset số giấy tờ về giá trị từ identity set mới nhất
+    const latestSet = identitySets[identitySets.length - 1];
+    if (latestSet) {
+      setCccdNumber(latestSet.cccdNumber || "");
+      setGplxNumber(latestSet.gplxNumber || "");
+    } else {
+      setCccdNumber("");
+      setGplxNumber("");
+    }
     clearAvatarSelection();
     clearGplxFrontSelection();
     clearGplxBackSelection();
     clearCccdFrontSelection();
     clearCccdBackSelection();
+    setNote("");
     setIsEditing(false);
   };
 
@@ -670,6 +727,48 @@ const Profile = () => {
             </div>
 
             {/* Removed general warning note per request */}
+
+            {/* Số giấy tờ */}
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">Số CCCD</Label>
+                  {isEditing ? (
+                    <Input
+                      id="cccdNumber"
+                      value={cccdNumber}
+                      onChange={(e) => setCccdNumber(e.target.value)}
+                      placeholder="Nhập số CCCD"
+                      disabled={saving}
+                      className="border-gray-300 focus:border-green-500 focus:ring-green-500"
+                    />
+                  ) : (
+                    <span className="text-base font-semibold text-gray-900 block">
+                      {cccdNumber || "Chưa cập nhật"}
+                    </span>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">Số GPLX</Label>
+                  {isEditing ? (
+                    <Input
+                      id="gplxNumber"
+                      value={gplxNumber}
+                      onChange={(e) => setGplxNumber(e.target.value)}
+                      placeholder="Nhập số GPLX"
+                      disabled={saving}
+                      className="border-gray-300 focus:border-green-500 focus:ring-green-500"
+                    />
+                  ) : (
+                    <span className="text-base font-semibold text-gray-900 block">
+                      {gplxNumber || "Chưa cập nhật"}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <Separator />
 
             {/* Ảnh GPLX - Mặt trước và Mặt sau */}
             <div className="space-y-6">

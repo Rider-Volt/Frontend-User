@@ -1,5 +1,7 @@
 // src/services/authService.ts
 
+import { IdentitySet } from "@/types/identity";
+
 // In development, always route through the Vite proxy at /api to avoid CORS
 export const API_BASE = import.meta.env.DEV ? "/api" : "https://backend.ridervolt.app/api";
 
@@ -65,6 +67,7 @@ export interface LoginResponse {
   nationalIdImageUrl?: string;
   driverLicenseImageUrl?: string;
   verified?: boolean;
+  identitySets?: IdentitySet[];
 }
 
 export interface RenterProfileApiResponse {
@@ -81,6 +84,7 @@ export interface RenterProfileApiResponse {
   nationalIdImageUrl?: string;
   driverLicenseImageUrl?: string;
   verified?: boolean;
+  identitySets?: IdentitySet[];
 }
 
 export interface UpdateUserPayload {
@@ -204,6 +208,9 @@ function mergeLoginState(
       profile?.driverLicenseImageUrl ?? base.driverLicenseImageUrl,
     verified:
       typeof profile?.verified === "boolean" ? profile.verified : base.verified,
+    identitySets: Array.isArray(profile?.identitySets)
+      ? profile?.identitySets
+      : base.identitySets,
   };
 }
 
@@ -382,6 +389,48 @@ export function getCurrentUserId(): number | undefined {
   return fromJwt;
 }
 
+// Update identity numbers (CCCD và GPLX numbers)
+export interface UpdateIdentityNumbersParams {
+  cccdNumber?: string;
+  gplxNumber?: string;
+}
+
+export async function updateIdentityNumbers(
+  params: UpdateIdentityNumbersParams,
+  token: string
+): Promise<RenterProfileApiResponse> {
+  const queryParams = new URLSearchParams();
+  if (params.cccdNumber) {
+    queryParams.append("cccdNumber", params.cccdNumber);
+  }
+  if (params.gplxNumber) {
+    queryParams.append("gplxNumber", params.gplxNumber);
+  }
+
+  const url = `${API_BASE}/renter/identity-numbers${queryParams.toString() ? `?${queryParams.toString()}` : ""}`;
+  
+  const resp = await fetch(url, {
+    method: "PATCH",
+    headers: authHeaders(token, "application/json"),
+  });
+
+  let data: any = {};
+  try {
+    data = await resp.json();
+  } catch {
+    data = {};
+  }
+
+  if (!resp.ok) {
+    const message =
+      (typeof data?.message === "string" && data.message) ||
+      "Không thể cập nhật số giấy tờ";
+    throw new Error(message);
+  }
+
+  return data as RenterProfileApiResponse;
+}
+
 // Upload identity set (CCCD và GPLX cùng lúc)
 export interface UploadIdentitySetParams {
   cccdFile?: File | null;
@@ -442,14 +491,22 @@ export async function uploadIdentitySet(
   return data;
 }
 
-async function uploadIdentityDocument(
+export async function uploadIdentityDocument(
   field: "cccd" | "gplx",
   file: File,
-  token: string
+  token: string,
+  side: "front" | "back" = "front"
 ): Promise<RenterProfileApiResponse> {
   const form = new FormData();
   form.append(field, file);
-  const resp = await fetch(`${API_BASE}/renter/${field === "cccd" ? "cccd" : "gplx"}`, {
+  
+  // Thêm query parameter side theo tài liệu API
+  const queryParams = new URLSearchParams();
+  queryParams.append("side", side);
+  
+  const url = `${API_BASE}/renter/${field === "cccd" ? "cccd" : "gplx"}?${queryParams.toString()}`;
+  
+  const resp = await fetch(url, {
     method: "POST",
     headers: authHeaders(token, null),
     body: form,

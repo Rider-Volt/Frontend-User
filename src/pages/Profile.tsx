@@ -50,7 +50,7 @@ const Profile = () => {
   const [identitySets, setIdentitySets] = useState<IdentitySet[]>([]);
   const [loadingIdentitySets, setLoadingIdentitySets] = useState(false);
   
-  const [note, setNote] = useState("");
+
   
   // Số giấy tờ
   const [cccdNumber, setCccdNumber] = useState("");
@@ -351,15 +351,6 @@ const Profile = () => {
         });
       }
 
-      const trimmedNote = note.trim();
-      if (trimmedNote) {
-        if (identityUploads.length > 0) {
-          identityUploads[identityUploads.length - 1].note = trimmedNote;
-        } else {
-          identityUploads.push({ note: trimmedNote });
-        }
-      }
-
       if (identityUploads.length > 0) {
         const uploadErrors: string[] = [];
         for (const payload of identityUploads) {
@@ -371,8 +362,7 @@ const Profile = () => {
             if (payload.cccdFile) {
               await uploadIdentityDocument("cccd", payload.cccdFile, token, payload.cccdSide || "front");
             }
-            // Nếu chỉ có note mà không có file, vẫn cần upload để tạo identity set mới
-            if (payload.note && !payload.gplxFile && !payload.cccdFile) {
+            if (payload.gplxFile || payload.cccdFile) {
               await uploadIdentitySet(payload, token);
             }
           } catch (error: any) {
@@ -434,7 +424,7 @@ const Profile = () => {
       clearGplxBackSelection();
       clearCccdFrontSelection();
       clearCccdBackSelection();
-      setNote("");
+
       alert("✅ Cập nhật thành công");
     } catch (err: any) {
       alert(err?.message || "❌ Cập nhật thất bại");
@@ -465,7 +455,6 @@ const Profile = () => {
     clearGplxBackSelection();
     clearCccdFrontSelection();
     clearCccdBackSelection();
-    setNote("");
     setIsEditing(false);
   };
 
@@ -728,27 +717,14 @@ const Profile = () => {
 
             {/* Removed general warning note per request */}
 
-            {/* Số giấy tờ */}
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium text-gray-700">Số CCCD</Label>
-                  {isEditing ? (
-                    <Input
-                      id="cccdNumber"
-                      value={cccdNumber}
-                      onChange={(e) => setCccdNumber(e.target.value)}
-                      placeholder="Nhập số CCCD"
-                      disabled={saving}
-                      className="border-gray-300 focus:border-green-500 focus:ring-green-500"
-                    />
-                  ) : (
-                    <span className="text-base font-semibold text-gray-900 block">
-                      {cccdNumber || "Chưa cập nhật"}
-                    </span>
-                  )}
-                </div>
-                <div className="space-y-2">
+            {/* Số giấy tờ — inputs moved into each document area */}
+
+            <Separator />
+
+            {/* Ảnh GPLX - Mặt trước và Mặt sau */}
+            <div className="space-y-6">
+              <div>
+                <div className="space-y-3 mb-4">
                   <Label className="text-sm font-medium text-gray-700">Số GPLX</Label>
                   {isEditing ? (
                     <Input
@@ -765,14 +741,6 @@ const Profile = () => {
                     </span>
                   )}
                 </div>
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Ảnh GPLX - Mặt trước và Mặt sau */}
-            <div className="space-y-6">
-              <div>
                 <Label className="text-lg font-semibold text-gray-900 mb-4 block">Ảnh GPLX</Label>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* GPLX Mặt trước */}
@@ -893,6 +861,23 @@ const Profile = () => {
 
               {/* Ảnh CCCD - Mặt trước và Mặt sau */}
               <div>
+                <div className="space-y-3 mb-4">
+                  <Label className="text-sm font-medium text-gray-700">Số CCCD</Label>
+                  {isEditing ? (
+                    <Input
+                      id="cccdNumber"
+                      value={cccdNumber}
+                      onChange={(e) => setCccdNumber(e.target.value)}
+                      placeholder="Nhập số CCCD"
+                      disabled={saving}
+                      className="border-gray-300 focus:border-green-500 focus:ring-green-500"
+                    />
+                  ) : (
+                    <span className="text-base font-semibold text-gray-900 block">
+                      {cccdNumber || "Chưa cập nhật"}
+                    </span>
+                  )}
+                </div>
                 <Label className="text-lg font-semibold text-gray-900 mb-4 block">Ảnh CCCD</Label>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* CCCD Mặt trước */}
@@ -1010,19 +995,6 @@ const Profile = () => {
               </div>
 
               <Separator />
-
-                {isEditing && (
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium text-gray-700">Ghi chú (tùy chọn)</Label>
-                    <Textarea
-                      value={note}
-                      onChange={(e) => setNote(e.target.value)}
-                      placeholder="Nhập ghi chú nếu có..."
-                      disabled={saving}
-                      className="min-h-[80px] border-gray-300 focus:border-green-500 focus:ring-green-500"
-                    />
-                  </div>
-                )}
 
                 {/* Hiển thị danh sách identity sets */}
                 {identitySets.length > 0 && (

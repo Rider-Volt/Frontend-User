@@ -168,6 +168,53 @@ export async function processPayOSPaymentReturn(queryParams?: URLSearchParams): 
   await resp.json().catch(() => ({}));
 }
 
+/**
+ * Call backend endpoint when PayOS redirects to success callback (GET /payments/success/{orderId})
+ * This endpoint is typically a public callback and doesn't require auth.
+ */
+export async function processPaymentSuccess(orderId: number): Promise<void> {
+  if (!Number.isFinite(orderId)) {
+    throw new Error("orderId không hợp lệ");
+  }
+
+  const token = requireToken();
+  const resp = await fetch(`${PAYOS_BASE}/success/${orderId}`, {
+    method: "GET",
+    headers: authHeaders(token),
+  });
+
+  if (!resp.ok) {
+    const data = await resp.json().catch(() => ({})) as { message?: string; error?: string };
+    const message = data?.message || data?.error || resp.statusText;
+    throw new Error(`Không thể xử lý callback success: ${message}`);
+  }
+
+  await resp.json().catch(() => ({}));
+}
+
+/**
+ * Call backend endpoint when PayOS redirects to cancel callback (GET /payments/cancel/{orderId})
+ */
+export async function processPaymentCancel(orderId: number): Promise<void> {
+  if (!Number.isFinite(orderId)) {
+    throw new Error("orderId không hợp lệ");
+  }
+
+  const token = requireToken();
+  const resp = await fetch(`${PAYOS_BASE}/cancel/${orderId}`, {
+    method: "GET",
+    headers: authHeaders(token),
+  });
+
+  if (!resp.ok) {
+    const data = await resp.json().catch(() => ({})) as { message?: string; error?: string };
+    const message = data?.message || data?.error || resp.statusText;
+    throw new Error(`Không thể xử lý callback cancel: ${message}`);
+  }
+
+  await resp.json().catch(() => ({}));
+}
+
 export async function createDemoPaymentInfo(
   options: DemoPaymentOptions
 ): Promise<DemoPaymentInfo> {

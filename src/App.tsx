@@ -11,6 +11,8 @@ import Profile from "./pages/Profile";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ResetPassword from "./pages/ResetPassword";
+import PaymentSuccess from "./pages/PaymentSuccess";
+import PaymentCallback from "./pages/PaymentCallback";
 // StationsPage removed per request
 import NotFound from "./pages/NotFound";
 
@@ -28,12 +30,18 @@ const App = () => (
           <Route path="/search" element={<CarSearchPage />} />
           {/* Stations page removed */}
           <Route path="/Bookings" element={<Bookings />} />
+          <Route path="/bookings" element={<Bookings />} />
           <Route path="/vehicle/:id" element={<VehicleDetailsPage />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ResetPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/payment/success" element={<PaymentSuccess />} />
+          <Route path="/payment/cancel" element={<PaymentSuccess />} />
+          <Route path="/payment/return" element={<PaymentSuccess />} />
+          <Route path="/payment/success/:orderId" element={<PaymentCallback />} />
+          <Route path="/payment/cancel/:orderId" element={<PaymentCallback />} />
 
          
 

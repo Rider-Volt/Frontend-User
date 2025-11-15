@@ -419,11 +419,7 @@ const Profile = () => {
         address: nextProfile.address || "",
       });
       setIsEditing(false);
-      clearAvatarSelection();
-      clearGplxFrontSelection();
-      clearGplxBackSelection();
-      clearCccdFrontSelection();
-      clearCccdBackSelection();
+      // Keep file previews and numbers visible after save so users know they've been submitted
 
       alert("✅ Cập nhật thành công");
     } catch (err: any) {
@@ -450,11 +446,7 @@ const Profile = () => {
       setCccdNumber("");
       setGplxNumber("");
     }
-    clearAvatarSelection();
-    clearGplxFrontSelection();
-    clearGplxBackSelection();
-    clearCccdFrontSelection();
-    clearCccdBackSelection();
+    // Keep file previews visible so users can see what they've uploaded
     setIsEditing(false);
   };
 

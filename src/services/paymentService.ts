@@ -170,7 +170,6 @@ export async function processPayOSPaymentReturn(queryParams?: URLSearchParams): 
 
 /**
  * Call backend endpoint when PayOS redirects to success callback (GET /payments/success/{orderId})
- * This endpoint is typically a public callback and doesn't require auth.
  */
 export async function processPaymentSuccess(orderId: number): Promise<void> {
   if (!Number.isFinite(orderId)) {

@@ -87,9 +87,7 @@ const Footer = () => {
               <li>
                 <span className="text-gray-300 text-sm">Thuê xe điện</span>
               </li>
-              <li>
-                <span className="text-gray-300 text-sm">Thuê xe máy điện</span>
-              </li>
+             
               <li>
                 <span className="text-gray-300 text-sm">Bảo hiểm thuê xe</span>
               </li>
@@ -106,7 +104,7 @@ const Footer = () => {
               <div className="flex items-center gap-3">
                 <MapPin className="w-4 h-4 text-green-400" />
                 <span className="text-gray-300 text-sm">
-                  123 Đường ABC, Quận XYZ, TP.HCM
+                  20 Tăng Nhơn Phú, Phước Long B, Thủ Đức, Hồ Chí Minh, Vietnam
                 </span>
               </div>
               <div className="flex items-center gap-3">
@@ -118,7 +116,7 @@ const Footer = () => {
               <div className="flex items-center gap-3">
                 <Mail className="w-4 h-4 text-green-400" />
                 <span className="text-gray-300 text-sm">
-                  support@evrental.vn
+                  EV Rental @evrental.vn
                 </span>
               </div>
             </div>

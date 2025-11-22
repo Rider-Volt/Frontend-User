@@ -12,6 +12,8 @@ import {
   Loader2,
   MapPin,
   User,
+  Star,
+  MessageSquare,
 } from "lucide-react";
 
 import Navbar from "@/components/heroUi/Navbar";
@@ -45,6 +47,21 @@ import {
   createDemoPaymentInfo,
   type DemoPaymentInfo,
 } from "@/services/paymentService";
+import { FeedbackModal } from "@/components/FeedbackModal";
+import { ReportModal } from "@/components/ReportModal";
+import { FeedbackReportSelector } from "@/components/FeedbackReportSelector";
+import {
+  getFeedbackByBillingId,
+  submitFeedback,
+  updateFeedback,
+  type FeedbackResponse,
+} from "@/services/feedbackService";
+import {
+  getReportByBillingId,
+  submitReport,
+  updateReport,
+  type ReportResponse,
+} from "@/services/reportsService";
 
 type ToastFn = ReturnType<typeof useToast>["toast"];
 
@@ -395,6 +412,38 @@ const Bookings = () => {
       }
   >(null);
 
+  const [feedbackModal, setFeedbackModal] = useState<{
+    open: boolean;
+    billingId: number;
+    vehicleName: string;
+    existingFeedback?: FeedbackResponse | null;
+  } | null>(null);
+  const [feedbackLoading, setFeedbackLoading] = useState<{
+    [key: number]: boolean;
+  }>({});
+  const [feedbacks, setFeedbacks] = useState<{
+    [key: number]: FeedbackResponse | null;
+  }>({});
+
+  const [reportModal, setReportModal] = useState<{
+    open: boolean;
+    billingId: number;
+    vehicleName: string;
+    existingReport?: ReportResponse | null;
+  } | null>(null);
+  const [reportLoading, setReportLoading] = useState<{
+    [key: number]: boolean;
+  }>({});
+  const [reports, setReports] = useState<{
+    [key: number]: ReportResponse | null;
+  }>({});
+
+  const [selectorModal, setSelectorModal] = useState<{
+    open: boolean;
+    billingId: number;
+    vehicleName: string;
+  } | null>(null);
+
   const navigate = useNavigate();
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
@@ -602,6 +651,261 @@ const Bookings = () => {
     } finally {
       setPayingId(null);
     }
+  };
+
+  const handleOpenFeedbackModal = async (booking: StoredBooking) => {
+    const billingId = booking.id ?? booking.bookingId;
+    if (!billingId) {
+      toast({
+        title: "Không tìm thấy mã hóa đơn",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const vehicleName =
+      booking.localVehicleName ?? booking.vehicleModel ?? `Hóa đơn #${billingId}`;
+
+    // Check if we already have the feedback cached
+    if (feedbacks[billingId] !== undefined) {
+      setFeedbackModal({
+        open: true,
+        billingId,
+        vehicleName,
+        existingFeedback: feedbacks[billingId],
+      });
+      return;
+    }
+
+    // Load feedback from API
+    setFeedbackLoading({
+      ...feedbackLoading,
+      [billingId]: true,
+    });
+
+    try {
+      const feedback = await getFeedbackByBillingId(billingId);
+      setFeedbacks({
+        ...feedbacks,
+        [billingId]: feedback,
+      });
+      setFeedbackModal({
+        open: true,
+        billingId,
+        vehicleName,
+        existingFeedback: feedback,
+      });
+    } catch (err) {
+      toast({
+        title: "Không thể tải đánh giá",
+        description:
+          err instanceof Error ? err.message : "Vui lòng thử lại sau.",
+        variant: "destructive",
+      });
+    } finally {
+      setFeedbackLoading({
+        ...feedbackLoading,
+        [billingId]: false,
+      });
+    }
+  };
+
+  const handleSubmitFeedback = async (
+    rating: number,
+    content: string,
+    imageFiles?: File[]
+  ) => {
+    if (!feedbackModal) return;
+
+    const { billingId } = feedbackModal;
+    const existingFeedback = feedbacks[billingId];
+
+    try {
+      let result: FeedbackResponse;
+
+      if (existingFeedback) {
+        // Update existing feedback
+        result = await updateFeedback(
+          existingFeedback.id,
+          {
+            rating,
+            content,
+          },
+          imageFiles
+        );
+      } else {
+        // Submit new feedback
+        result = await submitFeedback(
+          billingId,
+          {
+            type: "FEEDBACK",
+            rating,
+            content,
+          },
+          imageFiles
+        );
+      }
+
+      // Update local state
+      setFeedbacks({
+        ...feedbacks,
+        [billingId]: result,
+      });
+
+      toast({
+        title: existingFeedback ? "Đã cập nhật đánh giá" : "Gửi đánh giá thành công",
+        description: "Cảm ơn bạn đã chia sẻ trải nghiệm!",
+      });
+
+      setFeedbackModal(null);
+    } catch (err) {
+      toast({
+        title: "Lỗi",
+        description:
+          err instanceof Error ? err.message : "Không thể gửi đánh giá",
+        variant: "destructive",
+      });
+      throw err; // Let the modal handle the error state
+    }
+  };
+
+  const handleOpenReportModal = async (booking: StoredBooking) => {
+    const billingId = booking.id ?? booking.bookingId;
+    if (!billingId) {
+      toast({
+        title: "Không tìm thấy mã hóa đơn",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const vehicleName =
+      booking.localVehicleName ?? booking.vehicleModel ?? `Hóa đơn #${billingId}`;
+
+    // Check if we already have the report cached
+    if (reports[billingId] !== undefined) {
+      setReportModal({
+        open: true,
+        billingId,
+        vehicleName,
+        existingReport: reports[billingId],
+      });
+      return;
+    }
+
+    // Load report from API
+    setReportLoading({
+      ...reportLoading,
+      [billingId]: true,
+    });
+
+    try {
+      const report = await getReportByBillingId(billingId);
+      setReports({
+        ...reports,
+        [billingId]: report,
+      });
+      setReportModal({
+        open: true,
+        billingId,
+        vehicleName,
+        existingReport: report,
+      });
+    } catch (err) {
+      toast({
+        title: "Không thể tải báo cáo",
+        description:
+          err instanceof Error ? err.message : "Vui lòng thử lại sau.",
+        variant: "destructive",
+      });
+    } finally {
+      setReportLoading({
+        ...reportLoading,
+        [billingId]: false,
+      });
+    }
+  };
+
+  const handleSubmitReport = async (
+    severity: string,
+    note: string,
+    imageFiles?: File[]
+  ) => {
+    if (!reportModal) return;
+
+    const { billingId } = reportModal;
+    const existingReport = reports[billingId];
+
+    try {
+      let result: ReportResponse;
+
+      if (existingReport) {
+        // Update existing report
+        result = await updateReport(
+          existingReport.id,
+          {
+            severity: severity as any,
+            note,
+          },
+          imageFiles
+        );
+      } else {
+        // Submit new report
+        // Note: Backend IncidentReportCreateRequest only accepts billingId and note
+        // Severity may be set automatically by backend or can be updated later
+        result = await submitReport(
+          {
+            billingId,
+            note,
+          },
+          imageFiles
+        );
+      }
+
+      // Update local state
+      setReports({
+        ...reports,
+        [billingId]: result,
+      });
+
+      toast({
+        title: existingReport ? "Đã cập nhật báo cáo" : "Báo cáo gửi thành công",
+        description:
+          severity === "HIGH"
+            ? "Vấn đề nghiêm trọng đã được báo cáo. Nhân viên sẽ sớm liên hệ với bạn."
+            : "Cảm ơn bạn đã báo cáo vấn đề. Chúng tôi sẽ kiểm tra trong thời gian sớm nhất.",
+      });
+
+      setReportModal(null);
+    } catch (err) {
+      toast({
+        title: "Lỗi",
+        description:
+          err instanceof Error ? err.message : "Không thể gửi báo cáo",
+        variant: "destructive",
+      });
+      throw err; // Let the modal handle the error state
+    }
+  };
+
+  const handleOpenSelector = (booking: StoredBooking) => {
+    const billingId = booking.id ?? booking.bookingId;
+    if (!billingId) {
+      toast({
+        title: "Không tìm thấy mã hóa đơn",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const vehicleName =
+      booking.localVehicleName ?? booking.vehicleModel ?? `Hóa đơn #${billingId}`;
+
+    setSelectorModal({
+      open: true,
+      billingId,
+      vehicleName,
+    });
   };
 
   const renderList = (
@@ -1025,6 +1329,158 @@ const Bookings = () => {
                 </Button>
               </div>
             )}
+
+            {/* Feedback & Report section for DONE bookings */}
+            {booking.status === "DONE" && (
+              <div className="border-t pt-5 mt-5 space-y-4">
+                {/* Display feedback if exists */}
+                {feedbacks[id] && (
+                  <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
+                    <div className="flex items-start gap-2 mb-2">
+                      <Star className="h-5 w-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <p className="font-semibold text-sm text-gray-900">
+                          Đánh giá: {feedbacks[id]?.rating}/5 sao
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-sm text-gray-700 mb-2">
+                      {feedbacks[id]?.content}
+                    </p>
+                    {feedbacks[id]?.imageUrls && feedbacks[id]!.imageUrls!.length > 0 && (
+                      <div className="flex gap-2 flex-wrap mb-2">
+                        {feedbacks[id]!.imageUrls!.map((url, idx) => (
+                          <img
+                            key={idx}
+                            src={url}
+                            alt={`Feedback ${idx + 1}`}
+                            className="max-w-xs h-20 rounded-md object-cover"
+                          />
+                        ))}
+                      </div>
+                    )}
+                    <div className="text-xs text-gray-500">
+                      Trạng thái:{" "}
+                      {feedbacks[id]?.status === "PENDING_REVIEW"
+                        ? "Chờ duyệt"
+                        : feedbacks[id]?.status === "APPROVED"
+                        ? "Đã duyệt"
+                        : "Bị từ chối"}
+                    </div>
+                  </div>
+                )}
+
+                {/* Display report if exists */}
+                {reports[id] && (
+                  <div className={`rounded-lg p-4 border-2 ${
+                    reports[id]?.severity === "HIGH"
+                      ? "bg-red-50 border-red-200"
+                      : reports[id]?.severity === "MEDIUM"
+                      ? "bg-amber-50 border-amber-200"
+                      : "bg-blue-50 border-blue-200"
+                  }`}>
+                    <div className="flex items-start gap-2 mb-2">
+                      <AlertTriangle className={`h-5 w-5 flex-shrink-0 mt-0.5 ${
+                        reports[id]?.severity === "HIGH"
+                          ? "text-red-600"
+                          : reports[id]?.severity === "MEDIUM"
+                          ? "text-amber-600"
+                          : "text-blue-600"
+                      }`} />
+                      <div className="flex-1">
+                        <p className={`font-semibold text-sm ${
+                          reports[id]?.severity === "HIGH"
+                            ? "text-red-900"
+                            : reports[id]?.severity === "MEDIUM"
+                            ? "text-amber-900"
+                            : "text-blue-900"
+                        }`}>
+                          {reports[id]?.severity === "HIGH"
+                            ? "🔴 Vấn đề nghiêm trọng"
+                            : reports[id]?.severity === "MEDIUM"
+                            ? "🟡 Vấn đề trung bình"
+                            : "🔵 Vấn đề nhẹ"}
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-sm text-gray-700 mb-2 whitespace-pre-wrap">
+                      {reports[id]?.note}
+                    </p>
+                    {reports[id]?.imageUrls && reports[id]!.imageUrls!.length > 0 && (
+                      <div className="flex gap-2 flex-wrap mb-2">
+                        {reports[id]!.imageUrls!.map((url, idx) => (
+                          <img
+                            key={idx}
+                            src={url}
+                            alt={`Report ${idx + 1}`}
+                            className="max-w-xs h-20 rounded-md object-cover border border-gray-300"
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Single button to open selector */}
+                <Button
+                  onClick={() => handleOpenSelector(booking)}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5"
+                >
+                  <Star className="mr-2 h-4 w-4" />
+                  {feedbacks[id] || reports[id] ? "Cập nhật đánh giá / báo cáo" : "Chia sẻ đánh giá hoặc báo cáo vấn đề"}
+                </Button>
+              </div>
+            )}
+
+            {/* Report button for RENTING bookings */}
+            {booking.status === "RENTING" && (
+              <div className="border-t pt-5 mt-5">
+                {reports[id] && (
+                  <div className={`rounded-lg p-4 border-2 mb-3 ${
+                    reports[id]?.severity === "HIGH"
+                      ? "bg-red-50 border-red-200"
+                      : reports[id]?.severity === "MEDIUM"
+                      ? "bg-amber-50 border-amber-200"
+                      : "bg-blue-50 border-blue-200"
+                  }`}>
+                    <div className="flex items-start gap-2 mb-2">
+                      <AlertTriangle className={`h-5 w-5 flex-shrink-0 mt-0.5 ${
+                        reports[id]?.severity === "HIGH"
+                          ? "text-red-600"
+                          : reports[id]?.severity === "MEDIUM"
+                          ? "text-amber-600"
+                          : "text-blue-600"
+                      }`} />
+                      <p className={`font-semibold text-sm ${
+                        reports[id]?.severity === "HIGH"
+                          ? "text-red-900"
+                          : reports[id]?.severity === "MEDIUM"
+                          ? "text-amber-900"
+                          : "text-blue-900"
+                      }`}>
+                        {reports[id]?.severity === "HIGH"
+                          ? "🔴 Vấn đề nghiêm trọng"
+                          : reports[id]?.severity === "MEDIUM"
+                          ? "🟡 Vấn đề trung bình"
+                          : "🔵 Vấn đề nhẹ"}
+                      </p>
+                    </div>
+                    <p className="text-sm text-gray-700 mb-2 whitespace-pre-wrap">
+                      {reports[id]?.note}
+                    </p>
+                  </div>
+                )}
+
+                <Button
+                  onClick={() => handleOpenReportModal(booking)}
+                  variant="outline"
+                  className="w-full font-semibold border-red-300 text-red-700 hover:bg-red-50"
+                >
+                  <AlertTriangle className="mr-2 h-4 w-4" />
+                  {reports[id] ? "Chỉnh sửa báo cáo" : "Báo cáo vấn đề xe"}
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       );
@@ -1232,9 +1688,91 @@ const Bookings = () => {
             </CardContent>
           </Card>
         )}
+
+        {/* Payment Dialog */}
+        <PaymentDialog
+          state={paymentDialog}
+          onClose={() => setPaymentDialog(null)}
+          toast={toast}
+          onSuccess={async () => {
+            if (!paymentDialog) return;
+            try {
+              await mockMarkPaymentAsPaid(paymentDialog.bookingId);
+              setPaymentDialog(null);
+              await loadBookings(currentUserId ?? undefined, {
+                silent: true,
+                forceRefresh: true,
+              });
+              toast({
+                title: "Đánh dấu thanh toán thành công",
+                description:
+                  "Nhân viên sẽ kiểm tra và xác nhận trong vòng vài phút.",
+              });
+            } catch (err) {
+              toast({
+                title: "Không thể đánh dấu thanh toán",
+                description:
+                  err instanceof Error ? err.message : "Vui lòng thử lại sau.",
+                variant: "destructive",
+              });
+            }
+          }}
+        />
+
+        {/* Feedback Modal */}
+        {feedbackModal && (
+          <FeedbackModal
+            open={feedbackModal.open}
+            billingId={feedbackModal.billingId}
+            vehicleName={feedbackModal.vehicleName}
+            existingFeedback={feedbackModal.existingFeedback}
+            onClose={() => setFeedbackModal(null)}
+            onSubmit={handleSubmitFeedback}
+          />
+        )}
+
+        {/* Report Modal */}
+        {reportModal && (
+          <ReportModal
+            open={reportModal.open}
+            billingId={reportModal.billingId}
+            vehicleName={reportModal.vehicleName}
+            existingReport={reportModal.existingReport}
+            onClose={() => setReportModal(null)}
+            onSubmit={handleSubmitReport}
+          />
+        )}
+
+        {/* Feedback & Report Selector Modal */}
+        {selectorModal && (
+          <FeedbackReportSelector
+            open={selectorModal.open}
+            vehicleName={selectorModal.vehicleName}
+            hasFeedback={!!feedbacks[selectorModal.billingId]}
+            hasReport={!!reports[selectorModal.billingId]}
+            onSelectFeedback={() => {
+              handleOpenFeedbackModal(
+                bookings.find(
+                  (b) => (b.id ?? b.bookingId) === selectorModal.billingId
+                ) || ({} as StoredBooking)
+              );
+              setSelectorModal(null);
+            }}
+            onSelectReport={() => {
+              handleOpenReportModal(
+                bookings.find(
+                  (b) => (b.id ?? b.bookingId) === selectorModal.billingId
+                ) || ({} as StoredBooking)
+              );
+              setSelectorModal(null);
+            }}
+            onClose={() => setSelectorModal(null)}
+          />
+        )}
       </div>
     </div>
   );
 };
 
 export default Bookings;
+

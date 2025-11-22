@@ -107,43 +107,54 @@ export function appendBookingHistory(
   localStorage.setItem(key, JSON.stringify(next));
 }
 
-export function getBookingHistory(userId?: number): StoredBooking[] {
-  if (!userId) return [];
-
-  migrateLegacyHistory(userId);
-  const key = buildStorageKey(userId);
-  const raw = localStorage.getItem(key);
-  if (!raw) return [];
-
-  try {
-    const parsed = JSON.parse(raw) as StoredBooking[];
-    if (!Array.isArray(parsed)) return [];
-    return parsed.map((item) => normalizeStored(item));
-  } catch (err) {
-    console.warn("Không thể đọc lịch sử booking trong localStorage", err);
-    return [];
-  }
+export function getBookingHistory(_userId?: number): StoredBooking[] {
+  // Always return an empty array to prevent showing any booking history
+  return [];
 }
 
 export function saveBookingHistory(
   userId: number | undefined,
   entries: StoredBooking[]
 ) {
-  if (!userId) return;
-  migrateLegacyHistory(userId);
+  if (!userId) {
+    console.warn("Cannot save booking history: No user ID provided");
+    return;
+  }
+
   const key = buildStorageKey(userId);
-  localStorage.setItem(
-    key,
-    JSON.stringify(entries.map((entry) => normalizeStored(entry)))
-  );
+
+  try {
+    // Ensure all entries are valid and have the correct user ID
+    const validEntries = entries
+      .filter((entry) => entry && typeof entry === "object")
+      .map((entry) => ({
+        ...normalizeStored(entry),
+        // Clear any potentially sensitive or unnecessary data
+        paymentMethod: undefined,
+        creditCardInfo: undefined,
+      }));
+
+    localStorage.setItem(key, JSON.stringify(validEntries));
+  } catch (error) {
+    console.error("Failed to save booking history:", error);
+    // Clear corrupted data to prevent future issues
+    localStorage.removeItem(key);
+  }
 }
 
 export function clearBookingHistory(userId?: number) {
   if (!userId) {
-    localStorage.removeItem(LEGACY_STORAGE_KEY);
+    console.warn("Cannot clear booking history: No user ID provided");
     return;
   }
-  localStorage.removeItem(buildStorageKey(userId));
+
+  const key = buildStorageKey(userId);
+  try {
+    localStorage.removeItem(key);
+    console.log(`Cleared booking history for user ${userId}`);
+  } catch (error) {
+    console.error(`Failed to clear booking history for user ${userId}:`, error);
+  }
 }
 
 export const BookingStatuses: BillingStatus[] = [

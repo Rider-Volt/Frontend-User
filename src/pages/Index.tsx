@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Shield, Ticket, HeartHandshake } from "lucide-react";
 import Navbar from "../components/heroUi/Navbar";
+import Footer from "../components/heroUi/Footer";
 // Search bar removed from homepage
 import EVCard from "../components/heroUi/EVCard";
 import { useNavigate } from "react-router-dom";
@@ -178,10 +179,7 @@ const Index: React.FC = () => {
         </section>
       </main>
 
-      {/* Footer */}
-      <footer className="bg-gray-900 text-gray-300 py-12 px-4 mt-auto">
-        <div className="container mx-auto max-w-7xl">EV Rental © 2025</div>
-      </footer>
+      <Footer />
     </div>
   );
 };

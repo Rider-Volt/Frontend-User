@@ -431,66 +431,7 @@ export async function updateIdentityNumbers(
   return data as RenterProfileApiResponse;
 }
 
-// Upload identity set (CCCD và GPLX cùng lúc)
-export interface UploadIdentitySetParams {
-  cccdFile?: File | null;
-  gplxFile?: File | null;
-  cccdSide?: "front" | "back";
-  gplxSide?: "front" | "back";
-  note?: string;
-}
-
-export async function uploadIdentitySet(
-  params: UploadIdentitySetParams,
-  token: string
-): Promise<any> {
-  const form = new FormData();
-  
-  if (params.cccdFile instanceof File) {
-    form.append("cccd", params.cccdFile);
-  }
-  
-  if (params.gplxFile instanceof File) {
-    form.append("gplx", params.gplxFile);
-  }
-
-  // Build query parameters
-  const queryParams = new URLSearchParams();
-  if (params.cccdSide) {
-    queryParams.append("cccdSide", params.cccdSide);
-  }
-  if (params.gplxSide) {
-    queryParams.append("gplxSide", params.gplxSide);
-  }
-  if (params.note) {
-    queryParams.append("note", params.note);
-  }
-
-  const url = `${API_BASE}/renter/identity-sets${queryParams.toString() ? `?${queryParams.toString()}` : ""}`;
-  
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: authHeaders(token, null),
-    body: form,
-  });
-
-  let data: any = {};
-  try {
-    data = await resp.json();
-  } catch {
-    data = {};
-  }
-
-  if (!resp.ok) {
-    const message =
-      (typeof data?.message === "string" && data.message) ||
-      "Không thể upload giấy tờ";
-    throw new Error(message);
-  }
-
-  return data;
-}
-
+// Upload identity document (CCCD và GPLX cùng lúc)
 export async function uploadIdentityDocument(
   field: "cccd" | "gplx",
   file: File,
@@ -595,55 +536,39 @@ export async function updateUser(userPatch: UpdateUserPayload): Promise<LoginRes
     nextState = mergeProfileOnly(current, data as RenterProfileApiResponse);
   }
 
-  // Upload identity documents - ưu tiên sử dụng API mới nếu có cả hai file
+  // Upload identity documents
   const hasCccd = userPatch.nationalIdImageFile instanceof File;
   const hasGplx = userPatch.driverLicenseImageFile instanceof File;
 
-  if (hasCccd && hasGplx) {
-    // Upload cả hai cùng lúc bằng API mới
+  // Upload CCCD file if present
+  if (hasCccd) {
     try {
-      await uploadIdentitySet(
-        {
-          cccdFile: userPatch.nationalIdImageFile,
-          gplxFile: userPatch.driverLicenseImageFile,
-          cccdSide: "front", // Mặc định là mặt trước
-          gplxSide: "front", // Mặc định là mặt trước
-        },
-        token
-      );
-      // Refresh profile sau khi upload thành công
-      const refreshed = await fetchRenterMe(token);
-      nextState = mergeProfileOnly(nextState, refreshed);
-    } catch (err) {
-      console.warn("Không thể upload identity set, thử upload riêng lẻ:", err);
-      // Fallback: upload riêng lẻ nếu API mới thất bại
-      if (hasCccd) {
-        const profileAfterCccd = await uploadIdentityDocument("cccd", userPatch.nationalIdImageFile!, token);
-        nextState = mergeProfileOnly(nextState, profileAfterCccd);
-      }
-      if (hasGplx) {
-        const profileAfterGplx = await uploadIdentityDocument("gplx", userPatch.driverLicenseImageFile!, token);
-        nextState = mergeProfileOnly(nextState, profileAfterGplx);
-      }
-    }
-  } else {
-    // Upload riêng lẻ nếu chỉ có một file
-    if (hasCccd) {
       const profileAfterCccd = await uploadIdentityDocument(
         "cccd",
         userPatch.nationalIdImageFile!,
-        token
+        token,
+        "front" // Default to front side
       );
       nextState = mergeProfileOnly(nextState, profileAfterCccd);
+    } catch (error) {
+      console.warn("Lỗi upload CCCD:", error);
+      // Continue with other operations even if CCCD upload fails
     }
+  }
 
-    if (hasGplx) {
+  // Upload GPLX file if present
+  if (hasGplx) {
+    try {
       const profileAfterGplx = await uploadIdentityDocument(
         "gplx",
         userPatch.driverLicenseImageFile!,
-        token
+        token,
+        "front" // Default to front side
       );
       nextState = mergeProfileOnly(nextState, profileAfterGplx);
+    } catch (error) {
+      console.warn("Lỗi upload GPLX:", error);
+      // Continue with other operations even if GPLX upload fails
     }
   }
 
@@ -690,9 +615,24 @@ export async function logoutApi(): Promise<void> {
     }).catch(() => {});
   } finally {
     clearTimeout(timeout);
-    // Always clear local state so UI logs out even if server rejected the call
+    // Get current user ID before clearing the user data
+    const currentUser = getCurrentUser();
+    const userId = currentUser?.id || currentUser?.userId;
+    
+    // Clear local state
     localStorage.removeItem("token");
     localStorage.removeItem("user");
+    
+    // Clear booking history for the current user
+    if (userId) {
+      try {
+        // Import the clearBookingHistory function
+        const { clearBookingHistory } = await import('./bookingService');
+        clearBookingHistory(userId);
+      } catch (error) {
+        console.error('Failed to clear booking history on logout:', error);
+      }
+    }
   }
 }
 

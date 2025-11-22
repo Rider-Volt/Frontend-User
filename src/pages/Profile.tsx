@@ -11,7 +11,7 @@ import { Star, Home, Car, IdCard, Image as ImageIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import Navbar from "../components/heroUi/Navbar";
 import Footer from "../components/heroUi/Footer";
-import { getCurrentUser, refreshCurrentUser, updateUser, LoginResponse, uploadIdentitySet, getAuthToken, UploadIdentitySetParams, updateIdentityNumbers, uploadIdentityDocument } from "@/services/authService";
+import { getCurrentUser, refreshCurrentUser, updateUser, LoginResponse,  getAuthToken,  updateIdentityNumbers, uploadIdentityDocument } from "@/services/authService";
 import { listIdentitySets } from "@/services/renterBillingService";
 import { IdentitySet } from "@/types/identity";
 
@@ -315,79 +315,72 @@ const Profile = () => {
         throw new Error("Bạn cần đăng nhập để cập nhật");
       }
 
+      // Update basic profile info
       const updatedProfile = await updateUser({
         full_name: editData.full_name,
         email: editData.email,
         phone: editData.phone,
         address: editData.address,
         avatarFile,
-        // Không truyền giấy tờ vào updateUser nữa vì đã upload riêng
       });
       let nextProfile = updatedProfile;
 
-      const identityUploads: UploadIdentitySetParams[] = [];
+      // Upload identity documents
+      const uploadErrors: string[] = [];
+      
+      // Upload GPLX files
       if (gplxFrontFile) {
-        identityUploads.push({
-          gplxFile: gplxFrontFile,
-          gplxSide: "front" as const,
-        });
-      }
-      if (gplxBackFile) {
-        identityUploads.push({
-          gplxFile: gplxBackFile,
-          gplxSide: "back" as const,
-        });
-      }
-      if (cccdFrontFile) {
-        identityUploads.push({
-          cccdFile: cccdFrontFile,
-          cccdSide: "front" as const,
-        });
-      }
-      if (cccdBackFile) {
-        identityUploads.push({
-          cccdFile: cccdBackFile,
-          cccdSide: "back" as const,
-        });
-      }
-
-      if (identityUploads.length > 0) {
-        const uploadErrors: string[] = [];
-        for (const payload of identityUploads) {
-          try {
-            // Upload từng file riêng lẻ với API endpoint riêng và query parameter side
-            if (payload.gplxFile) {
-              await uploadIdentityDocument("gplx", payload.gplxFile, token, payload.gplxSide || "front");
-            }
-            if (payload.cccdFile) {
-              await uploadIdentityDocument("cccd", payload.cccdFile, token, payload.cccdSide || "front");
-            }
-            if (payload.gplxFile || payload.cccdFile) {
-              await uploadIdentitySet(payload, token);
-            }
-          } catch (error: any) {
-            const message =
-              error instanceof Error
-                ? error.message
-                : typeof error === "string"
-                ? error
-                : "Không thể tải lên giấy tờ";
-            uploadErrors.push(message);
-            console.warn("Lỗi upload giấy tờ:", error);
-          }
-        }
-
         try {
-          const sets = await listIdentitySets();
-          setIdentitySets(sets);
-          nextProfile = { ...nextProfile, identitySets: sets };
-        } catch (err: any) {
-          console.warn("Lỗi reload identity sets:", err);
+          await uploadIdentityDocument("gplx", gplxFrontFile, token, "front");
+        } catch (error: any) {
+          const message = error instanceof Error ? error.message : "Không thể tải lên mặt trước GPLX";
+          uploadErrors.push(message);
+          console.warn("Lỗi upload mặt trước GPLX:", error);
         }
+      }
+      
+      if (gplxBackFile) {
+        try {
+          await uploadIdentityDocument("gplx", gplxBackFile, token, "back");
+        } catch (error: any) {
+          const message = error instanceof Error ? error.message : "Không thể tải lên mặt sau GPLX";
+          uploadErrors.push(message);
+          console.warn("Lỗi upload mặt sau GPLX:", error);
+        }
+      }
 
-        if (uploadErrors.length > 0) {
-          throw new Error(uploadErrors[0]);
+      // Upload CCCD files
+      if (cccdFrontFile) {
+        try {
+          await uploadIdentityDocument("cccd", cccdFrontFile, token, "front");
+        } catch (error: any) {
+          const message = error instanceof Error ? error.message : "Không thể tải lên mặt trước CCCD";
+          uploadErrors.push(message);
+          console.warn("Lỗi upload mặt trước CCCD:", error);
         }
+      }
+
+      if (cccdBackFile) {
+        try {
+          await uploadIdentityDocument("cccd", cccdBackFile, token, "back");
+        } catch (error: any) {
+          const message = error instanceof Error ? error.message : "Không thể tải lên mặt sau CCCD";
+          uploadErrors.push(message);
+          console.warn("Lỗi upload mặt sau CCCD:", error);
+        }
+      }
+
+      // Refresh identity sets if needed
+      try {
+        const sets = await listIdentitySets();
+        setIdentitySets(sets);
+        nextProfile = { ...nextProfile, identitySets: sets };
+      } catch (err: any) {
+        console.warn("Lỗi tải lại danh sách giấy tờ:", err);
+      }
+
+      if (uploadErrors.length > 0) {
+        throw new Error(uploadErrors[0]);
       }
 
       // Cập nhật số giấy tờ nếu có (chạy độc lập với upload ảnh)
